@@ -4,83 +4,73 @@ from softgrad.layer import Layer
 
 
 class MaxPool2d(Layer):
-    def __init__(self, kernel_size: tuple | int, stride: tuple | int = None, padding: tuple | int = 0, dilation: tuple | int = 0):
+    def __init__(self, kernel_size: tuple | int):
         super().__init__()
         if isinstance(kernel_size, int):
             self.kernel_size = (kernel_size, kernel_size)
         else:
             self.kernel_size = kernel_size
-        if stride is None:
-            self.stride = self.kernel_size
-        elif isinstance(stride, int):
-            self.stride = (stride, stride)
-        else:
-            self.stride = stride
-        if isinstance(padding, int):
-            self.padding = (padding, padding)
-        else:
-            self.padding = padding
-        if isinstance(dilation, int):
-            self.dilation = (dilation, dilation)
-        else:
-            self.dilation = dilation
 
     def _link(self) -> None:
         if len(self.input_shape) != 3:
-            raise ValueError("Input shape must be 3 dimensional (C, H, W).")
+            raise ValueError("Input shape must be 3 dimensional (H, W, C).")
 
-        h_in, w_in = self.input_shape[1:]
-        w_out = math.floor((w_in + 2 * self.padding[1] - self.dilation[1] * (self.kernel_size[1] - 1) - 1) / self.stride[1] + 1)
-        h_out = math.floor((h_in + 2 * self.padding[0] - self.dilation[0] * (self.kernel_size[0] - 1) - 1) / self.stride[0] + 1)
-        self.output_shape = (self.input_shape[0], h_out, w_out)
+        h_in, w_in, c = self.input_shape
+        h_out = h_in // self.kernel_size[0]
+        w_out = w_in // self.kernel_size[1]
+        self.output_shape = (h_out, w_out, c)
 
-    # todo: implement dilation
     def _forward(self, x_in: mx.array) -> mx.array:
-        x_out = mx.zeros((x_in.shape[0], *self.output_shape))
-        max_indices = mx.zeros((x_in.shape[0], self.output_shape[0], self.output_shape[1] * self.output_shape[2]))
+        batch_size = x_in.shape[0]
+        h_out, w_out, c = self.output_shape
+        kh, kw = self.kernel_size
 
-        # Pad the input
-        x_in_padded = mx.pad(x_in, ((0, 0), (0, 0), (self.padding[0], self.padding[0]), (self.padding[1], self.padding[1])))
+        x_out = mx.zeros((batch_size, h_out, w_out, c))
+        max_indices = mx.zeros((batch_size, h_out * w_out, c), dtype=mx.int32)
 
-        h_out, w_out = self.output_shape[1:]
         for y in range(h_out):
             for x in range(w_out):
-                h_start = y * self.stride[0]
-                h_end = h_start + self.kernel_size[0]
-                w_start = x * self.stride[1]
-                w_end = w_start + self.kernel_size[1]
+                h_start = y * kh
+                h_end = h_start + kh
+                w_start = x * kw
+                w_end = w_start + kw
 
-                # write max value to output
-                window = x_in_padded[:, :, h_start:h_end, w_start:w_end]
-                x_out[:, :, y, x] = mx.max(window, axis=(2, 3))
+                # Extract window and find max
+                window = x_in[:, h_start:h_end, w_start:w_end, :]
+                x_out[:, y, x, :] = mx.max(window, axis=(1, 2))
 
-                # write max index to ctx.max_indices
-                window_flat = window.reshape(window.shape[0], window.shape[1], -1)  # Flatten spatial dimensions
-                max_idx = mx.argmax(window_flat, axis=-1)  # Get the index of the max value
-                max_indices[:, :, y * w_out + x] = max_idx
+                # Store flattened indices of max values
+                window_flat = window.reshape(batch_size, -1, c)
+                max_idx = mx.argmax(window_flat, axis=1)
+                max_indices[:, y * w_out + x, :] = max_idx
 
         self.ctx['max_indices'] = max_indices
         return x_out
 
-    # todo: implement padding
-    # todo: implement dilation
     def _backward(self, dx_out: mx.array) -> mx.array:
         dx_in = mx.zeros(self.ctx.x_in.shape)
         max_indices = self.ctx['max_indices']
-        h_out, w_out = self.output_shape[1:]
+
+        batch_size, h_in, w_in, c = self.ctx.x_in.shape
+        _, h_out, w_out, _ = dx_out.shape
+        kh, kw = self.kernel_size
+
         for y in range(h_out):
             for x in range(w_out):
-                h_start = y * self.stride[0]
-                h_end = min(h_start + self.kernel_size[0], self.input_shape[1])
-                w_start = x * self.stride[1]
-                w_end = min(w_start + self.kernel_size[1], self.input_shape[2])
+                h_start = y * kh
+                h_end = h_start + kh
+                w_start = x * kw
+                w_end = w_start + kw
 
-                # todo: mx.newaxis makes shit pretty hard to understand - ur resizing implicitly - revise
-                # a[..., i, mx.newaxis, ...] basically means select i but keep its dimension
-                indices = max_indices[:, :, y * w_out + x, mx.newaxis]
-                flat_mask = mx.where(indices == mx.arange((h_end - h_start) * (w_end - w_start)), 1, 0)
-                mask = flat_mask.reshape(-1, self.input_shape[0], h_end - h_start, w_end - w_start)
-                grad = dx_out[:, :, y, mx.newaxis, x, mx.newaxis]
-                dx_in[:, :, h_start:h_end, w_start:w_end] += grad * mask
+                # Get max indices for this output position
+                indices = max_indices[:, y * w_out + x, :, mx.newaxis]
+
+                # Create mask indicating where the max value was
+                flat_mask = mx.where(indices == mx.arange(kh * kw), 1, 0)
+                mask = flat_mask.reshape(batch_size, kh, kw, c)
+
+                # Route gradient to max position
+                grad = dx_out[:, y, mx.newaxis, x, mx.newaxis, :]
+                dx_in[:, h_start:h_end, w_start:w_end, :] += grad * mask
 
         return dx_in
