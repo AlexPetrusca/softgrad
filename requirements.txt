@@ -1,0 +1,8 @@
+numpy
+torch
+torchvision
+mlx
+matplotlib
+ipywidgets
+pillow
+./softgrad
