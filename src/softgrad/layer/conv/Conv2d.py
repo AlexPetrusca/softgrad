@@ -1,6 +1,47 @@
 import math
 from mlx import core as mx
 from softgrad.layer import Layer
+from operator import mul
+from itertools import accumulate
+
+
+# todo: this is used in MaxPool2d as well, refactor out
+def _sliding_windows(x, window_shape, window_strides):
+    """Extract sliding windows from input tensor."""
+    if x.ndim < 3:
+        raise ValueError(
+            f"To extract sliding windows at least 1 spatial dimension "
+            f"(3 total) is needed but the input only has {x.ndim} dimensions."
+        )
+
+    spatial_dims = x.shape[1:-1]
+    if not (len(spatial_dims) == len(window_shape) == len(window_strides)):
+        raise ValueError(
+            f"To extract sliding windows the window shapes and strides must have "
+            f"the same number of spatial dimensions as the signal."
+        )
+
+    shape = x.shape
+    strides = list(reversed(list(accumulate(reversed(shape + (1,)), mul))))[1:]
+
+    # Compute output shape
+    final_shape = [shape[0]]
+    final_shape += [
+        (size - window) // stride + 1
+        for size, window, stride in zip(spatial_dims, window_shape, window_strides)
+    ]
+    final_shape += window_shape
+    final_shape += [shape[-1]]
+
+    # Compute output strides
+    final_strides = strides[:1]
+    final_strides += [
+        og_stride * stride for og_stride, stride in zip(strides[1:-1], window_strides)
+    ]
+    final_strides += strides[1:-1]
+    final_strides += strides[-1:]
+
+    return mx.as_strided(x, final_shape, final_strides)
 
 
 class Conv2d(Layer):
@@ -12,6 +53,7 @@ class Conv2d(Layer):
             self.kernel_size = (kernel_size, kernel_size)
         else:
             self.kernel_size = kernel_size
+        self.stride = (1, 1)  # No stride for simplicity
 
     def _link(self) -> None:
         if len(self.input_shape) != 3:
@@ -40,52 +82,73 @@ class Conv2d(Layer):
         )
 
     def _forward(self, x_in: mx.array) -> mx.array:
-        batch_size = x_in.shape[0]
-        h_out, w_out, _ = self.output_shape
-        kh, kw = self.kernel_size
+        # Extract sliding windows: (batch, h_out, w_out, kh, kw, C_in)
+        windows = _sliding_windows(x_in, self.kernel_size, self.stride)
 
-        x_out = mx.zeros((batch_size, h_out, w_out, self.out_channels))
+        batch_size, h_out, w_out, kh, kw, c_in = windows.shape
 
-        # Reshape weights for matrix multiplication
-        W_reshaped = self.params["W"].reshape(-1, self.out_channels)  # (kh*kw*C_in, C_out)
+        # Reshape windows for matrix multiplication
+        # (batch, h_out, w_out, kh, kw, C_in) -> (batch, h_out, w_out, kh*kw*C_in)
+        windows_flat = windows.reshape(batch_size, h_out, w_out, -1)
 
-        for y in range(h_out):
-            for x in range(w_out):
-                # Extract window
-                window = x_in[:, y:y + kh, x:x + kw, :]  # (batch, kh, kw, C_in)
-                window_flat = window.reshape(batch_size, -1)  # (batch, kh*kw*C_in)
+        # Reshape weights: (kh, kw, C_in, C_out) -> (kh*kw*C_in, C_out)
+        W_flat = self.params["W"].reshape(-1, self.out_channels)
 
-                # Convolve: window @ weights + bias
-                x_out[:, y, x, :] = window_flat @ W_reshaped + self.params["b"]
+        # Perform convolution as batched matrix multiplication
+        # (batch, h_out, w_out, kh*kw*C_in) @ (kh*kw*C_in, C_out) = (batch, h_out, w_out, C_out)
+        x_out = windows_flat @ W_flat + self.params["b"]
+
+        # Store for backward pass
+        self.ctx['windows_flat'] = windows_flat
 
         return x_out
 
     def _backward(self, dx_out: mx.array) -> mx.array:
+        windows_flat = self.ctx['windows_flat']  # (batch, h_out, w_out, kh*kw*C_in)
+
         batch_size, h_in, w_in, c_in = self.ctx.x_in.shape
-        _, h_out, w_out, _ = dx_out.shape
+        _, h_out, w_out, c_out = dx_out.shape
         kh, kw = self.kernel_size
 
-        dx_in = mx.zeros(self.ctx.x_in.shape)
-        W_reshaped = self.params["W"].reshape(-1, self.out_channels)  # (kh*kw*C_in, C_out)
+        # Gradient for weights
+        # Reshape for batch matrix multiplication
+        # windows_flat: (batch*h_out*w_out, kh*kw*C_in)
+        # dx_out: (batch*h_out*w_out, C_out)
+        windows_reshaped = windows_flat.reshape(-1, kh * kw * c_in)
+        dx_out_reshaped = dx_out.reshape(-1, c_out)
 
-        for y in range(h_out):
-            for x in range(w_out):
-                # Extract window from input
-                window = self.ctx.x_in[:, y:y + kh, x:x + kw, :]  # (batch, kh, kw, C_in)
-                window_flat = window.reshape(batch_size, -1)  # (batch, kh*kw*C_in)
-                grad = dx_out[:, y, x, :]  # (batch, C_out)
+        # dW = windows^T @ dx_out
+        # (kh*kw*C_in, batch*h_out*w_out) @ (batch*h_out*w_out, C_out) = (kh*kw*C_in, C_out)
+        dW_flat = windows_reshaped.T @ dx_out_reshaped
+        self.params["dW"] += dW_flat.reshape(kh, kw, c_in, c_out)
 
-                # Gradient for weights: window^T @ grad
-                dW_flat = window_flat.T @ grad  # (kh*kw*C_in, batch) @ (batch, C_out) = (kh*kw*C_in, C_out)
-                dW = dW_flat.reshape(kh, kw, c_in, self.out_channels)
-                self.params["dW"] += dW
+        # Gradient for bias: sum over all spatial and batch dimensions
+        self.params["db"] += mx.sum(dx_out, axis=(0, 1, 2))
 
-                # Gradient for bias: sum over batch
-                self.params["db"] += mx.sum(grad, axis=0)
+        # Gradient for input
+        # dx_out: (batch, h_out, w_out, C_out)
+        # W: (kh*kw*C_in, C_out)
+        W_flat = self.params["W"].reshape(-1, self.out_channels)
 
-                # Gradient for input: grad @ weights^T
-                dx_window = grad @ W_reshaped.T  # (batch, C_out) @ (C_out, kh*kw*C_in) = (batch, kh*kw*C_in)
-                dx_window_reshaped = dx_window.reshape(batch_size, kh, kw, c_in)
-                dx_in[:, y:y + kh, x:x + kw, :] += dx_window_reshaped
+        # (batch, h_out, w_out, C_out) @ (C_out, kh*kw*C_in) = (batch, h_out, w_out, kh*kw*C_in)
+        dx_windows_flat = dx_out @ W_flat.T
+
+        # Reshape to window dimensions
+        # (batch, h_out, w_out, kh*kw*C_in) -> (batch, h_out, w_out, kh, kw, C_in)
+        dx_windows = dx_windows_flat.reshape(batch_size, h_out, w_out, kh, kw, c_in)
+
+        # Accumulate gradients back to input positions
+        # This requires looping because windows overlap
+        dx_in = mx.zeros((batch_size, h_in, w_in, c_in))
+
+        for i in range(h_out):
+            for j in range(w_out):
+                h_start = i * self.stride[0]
+                h_end = h_start + kh
+                w_start = j * self.stride[1]
+                w_end = w_start + kw
+
+                # Accumulate gradient for this window
+                dx_in[:, h_start:h_end, w_start:w_end, :] += dx_windows[:, i, j, :, :, :]
 
         return dx_in

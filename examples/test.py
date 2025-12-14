@@ -1,5 +1,7 @@
 # train the model
 
+from datetime import datetime
+
 import numpy as np
 import mlx.core as mx
 import mlx.nn as nn
@@ -129,6 +131,7 @@ def train(train_data, epochs, batch_size=1, test_data=None, cb=None):
 
     _, train_accuracy, train_loss = eval_model(network, batched_train_data, epoch=0)
     _, test_accuracy, test_loss = eval_model(network, batched_test_data, epoch=0)
+    print(f"{datetime.now()}")
     print()
     history["epoch"].append(0)
     history["train_loss"].append(train_loss)
@@ -141,6 +144,7 @@ def train(train_data, epochs, batch_size=1, test_data=None, cb=None):
 
         _, train_accuracy, train_loss = eval_model(network, batched_train_data, epoch=epoch)
         _, test_accuracy, test_loss = eval_model(network, batched_test_data, epoch=epoch)
+        print(f"{datetime.now()}")
         print()
         history["epoch"].append(epoch)
         history["train_loss"].append(train_loss)
