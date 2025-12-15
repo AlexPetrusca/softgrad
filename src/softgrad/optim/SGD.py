@@ -19,7 +19,10 @@ class SGD(Optimizer):
             grad = layer.backward(grad)
 
         # update layers
-        for i, layer in enumerate(self.network.layers):
+        trainable_layers = []
+        for layer in self.network.layers:
+            trainable_layers.extend(layer.get_trainable_layers())
+        for i, layer in enumerate(trainable_layers):
             if layer.trainable:
                 batch_size = layer.ctx.dx_out.shape[0]
                 eta = self.eta / batch_size

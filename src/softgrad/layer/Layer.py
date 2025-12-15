@@ -32,6 +32,11 @@ class Layer(ABC):
             self.ctx.dx_in = dx_in
         return dx_in
 
+    def get_trainable_layers(self):
+        if self.trainable:
+            return [self]
+        return []
+
     def freeze(self):
         self.trainable = False
 

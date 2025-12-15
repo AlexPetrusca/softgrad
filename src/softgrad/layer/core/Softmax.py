@@ -9,6 +9,7 @@ class Softmax(Layer):
         super().__init__()
         self.fn: Function = F.Softmax()
         self.temperature: float = temperature
+        self.trainable: bool = False
 
     def _link(self):
         self.output_shape = self.input_shape

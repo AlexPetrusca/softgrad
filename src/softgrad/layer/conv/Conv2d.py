@@ -53,7 +53,7 @@ class Conv2d(Layer):
             self.kernel_size = (kernel_size, kernel_size)
         else:
             self.kernel_size = kernel_size
-        self.stride = (1, 1)  # No stride for simplicity
+        self.stride = (1, 1)  # No stride
 
     def _link(self) -> None:
         if len(self.input_shape) != 3:

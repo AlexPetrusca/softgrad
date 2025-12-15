@@ -7,6 +7,7 @@ class Activation(Layer):
     def __init__(self, fn: Function):
         super().__init__()
         self.fn: Function = fn
+        self.trainable: bool = False
 
     def _link(self):
         self.output_shape = self.input_shape
