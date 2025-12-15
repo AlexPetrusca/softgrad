@@ -1,10 +1,10 @@
 import math
 import mlx.core as mx
-from softgrad.layer.Layer import Layer
+from softgrad.layer import TrainableLayer
 
 
 # todo: add Linear function?
-class Linear(Layer):
+class Linear(TrainableLayer):
     def __init__(self, output_dims: int):
         super().__init__()
         self.output_shape = (output_dims,)

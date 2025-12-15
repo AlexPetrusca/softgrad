@@ -1,9 +1,9 @@
 import math
 from mlx import core as mx
-from softgrad.layer import Layer
+from softgrad.layer import TrainableLayer
 
 
-class NaiveConv2d(Layer):
+class NaiveConv2d(TrainableLayer):
     def __init__(self, in_channels: int, out_channels: int, kernel_size: tuple | int):
         super().__init__()
         self.in_channels = in_channels

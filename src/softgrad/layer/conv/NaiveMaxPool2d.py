@@ -1,9 +1,9 @@
 import math
 from mlx import core as mx
-from softgrad.layer import Layer
+from softgrad.layer import TrainableLayer
 
 
-class NaiveMaxPool2d(Layer):
+class NaiveMaxPool2d(TrainableLayer):
     def __init__(self, kernel_size: tuple | int):
         super().__init__()
         if isinstance(kernel_size, int):

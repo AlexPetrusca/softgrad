@@ -1,9 +1,9 @@
 import math
 from mlx import core as mx
-from softgrad.layer import Layer
+from softgrad.layer import TrainableLayer
 
 
-class Embedding(Layer):
+class Embedding(TrainableLayer):
     def __init__(self, num_embeddings: int, embedding_dim: int):
         super().__init__()
         self.num_embeddings = num_embeddings
@@ -33,7 +33,7 @@ class Embedding(Layer):
         return mx.zeros_like(indices, dtype=mx.float32)
 
 
-class EmbeddingEfficient(Layer):
+class EmbeddingEfficient(TrainableLayer):
     """
     More efficient version using scatter operations instead of loops.
     """

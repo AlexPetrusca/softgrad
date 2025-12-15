@@ -1,9 +1,9 @@
 import torch as tc
 import numpy as np
 from mlx import core as mx
-from softgrad.layer import Layer
+from softgrad.layer import TrainableLayer
 
-class PyTorch(Layer):
+class PyTorch(TrainableLayer):
     mps_device = tc.device("mps")
 
     def __init__(self, layer: tc.nn.Module):

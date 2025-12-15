@@ -1,9 +1,9 @@
 from mlx import core as mx
 from mlx import nn as nn
-from softgrad.layer import Layer
+from softgrad.layer import TrainableLayer
 
 
-class MLX(Layer):
+class MLX(TrainableLayer):
     def __init__(self, layer: nn.Module):
         super().__init__()
         self.layer: nn.Module = layer

@@ -1,6 +1,6 @@
 import math
 from mlx import core as mx
-from softgrad.layer import Layer
+from softgrad.layer import TrainableLayer
 
 
 # todo: this is used in Conv2d as well, refactor out
@@ -67,7 +67,7 @@ def _sliding_windows(x, window_shape, window_strides):
     return mx.as_strided(x, final_shape, final_strides)
 
 
-class MaxPool2d(Layer):
+class MaxPool2d(TrainableLayer):
     def __init__(self, kernel_size: tuple | int):
         super().__init__()
         if isinstance(kernel_size, int):
