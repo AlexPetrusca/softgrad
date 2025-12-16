@@ -1,11 +1,7 @@
+import mlx.core as mx
+from softgrad.layer import TrainableLayer
+
 class RMSNorm(TrainableLayer):
-    """
-    Root Mean Square Layer Normalization (simpler variant used in modern architectures).
-
-    RMSNorm only normalizes by the RMS (no mean centering), making it more efficient.
-    Used in LLaMA, GPT-3, and other large language models.
-    """
-
     def __init__(self, eps=1e-5):
         super().__init__()
         self.eps = eps

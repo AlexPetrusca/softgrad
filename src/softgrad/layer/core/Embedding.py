@@ -30,7 +30,7 @@ class Embedding(TrainableLayer):
             self.params["dembeddings"][idx] += dx_out_flat[i]
 
         # No gradient (return zeros for consistency)
-        return mx.zeros_like(indices, dtype=mx.float32)
+        return mx.zeros(indices.shape, dtype=mx.float32)
 
 
 class EmbeddingEfficient(TrainableLayer):
@@ -46,11 +46,8 @@ class EmbeddingEfficient(TrainableLayer):
 
     def _link(self):
         scale = math.sqrt(1.0 / self.embedding_dim)
-        self.params["embeddings"] = mx.random.uniform(
-            -scale,
-            scale,
-            shape=(self.num_embeddings, self.embedding_dim)
-        )
+        shape = (self.num_embeddings, self.embedding_dim)
+        self.params["embeddings"] = mx.random.uniform(-scale, scale, shape=shape)
 
     def _forward(self, x_in: mx.array) -> mx.array:
         self.ctx['indices'] = x_in
@@ -78,4 +75,4 @@ class EmbeddingEfficient(TrainableLayer):
                 )
                 self.params["dembeddings"][idx] += grad_for_idx
 
-        return mx.zeros_like(indices, dtype=mx.float32)
+        return mx.zeros(indices.shape, dtype=mx.float32)

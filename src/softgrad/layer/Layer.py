@@ -68,13 +68,14 @@ class Layer(ABC):
             self.dx_in = None
 
     class Parameter:
-        def __init__(self, name: str, value: mx.array = 0, gradient: mx.array = 0):
+        def __init__(self, name: str, value: mx.array = None, gradient: mx.array = None):
             self.name: str = name
             self.value: mx.array = value
             self.grad: mx.array = gradient
 
         def zero_grad(self):
-            self.grad = 0
+            if self.grad is not None:
+                self.grad = mx.zeros_like(self.grad)
 
     class Parameters:
         def __init__(self):
@@ -95,11 +96,12 @@ class Layer(ABC):
                 if is_grad:
                     raise KeyError(f"Parameter {key} is not defined.")
                 else:
-                    self._params[key] = Layer.Parameter(key)
-            if is_grad:
-                self._params[key].grad = val
+                    self._params[key] = Layer.Parameter(key, value=val, gradient=mx.zeros_like(val))
             else:
-                self._params[key].value = val
+                if is_grad:
+                    self._params[key].grad = val
+                else:
+                    self._params[key].value = val
 
         def __iter__(self):
             return self._params.values().__iter__()
