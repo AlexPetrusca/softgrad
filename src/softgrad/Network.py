@@ -1,10 +1,9 @@
-from abc import ABC
 import mlx.core as mx
 from softgrad.Checkpoint import Checkpoint
 from softgrad.layer.Layer import Layer
 
 
-class Network(ABC):
+class Network():
     def __init__(self, input_shape: tuple | int, layers=None):
         if isinstance(input_shape, int):
             self.input_shape = (input_shape,)
