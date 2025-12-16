@@ -5,7 +5,7 @@ from softgrad.layer import Layer
 class Sequential(RecursiveLayer):
     def __init__(self, layers: List[Layer]):
         super().__init__()
-        self.children.extend(layers)
+        self.children = layers
 
     def get_trainable_layers(self):
         trainable = []

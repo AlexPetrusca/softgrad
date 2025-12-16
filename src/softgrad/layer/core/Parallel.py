@@ -1,36 +1,29 @@
 import mlx.core as mx
-from softgrad.layer import Layer
+from softgrad.layer import RecursiveLayer
 from softgrad.function import Function
 
 
-class Parallel(Layer):
+# todo: test
+class Parallel(RecursiveLayer):
     def __init__(self, layers, aggregation_fn):
-        """
-        Parallel layer that feeds input to multiple sublayers and aggregates results.
-
-        Args:
-            layers: List of layers to execute in parallel
-            aggregation_fn: Function to aggregate outputs (must have apply/derivative)
-        """
         super().__init__()
-        self.layers = layers
+        self.children = layers
         self.aggregation_fn = aggregation_fn
-        self.trainable = False  # Parallel itself has no params
 
     def get_trainable_layers(self):
         """Return all trainable layers from all branches."""
         trainable = []
-        for layer in self.layers:
+        for layer in self.children:
             trainable.extend(layer.get_trainable_layers())
         return trainable
 
     def _link(self):
         # Link all sublayers with the same input shape
-        for layer in self.layers:
+        for layer in self.children:
             layer.link(self.input_shape)
 
         # Verify all outputs have the same shape (required for aggregation)
-        output_shapes = [layer.output_shape for layer in self.layers]
+        output_shapes = [layer.output_shape for layer in self.children]
         if not all(shape == output_shapes[0] for shape in output_shapes):
             raise ValueError(
                 f"All parallel layers must have the same output shape for aggregation. "
@@ -41,7 +34,7 @@ class Parallel(Layer):
 
     def _forward(self, x_in: mx.array) -> mx.array:
         # Execute all layers in parallel
-        outputs = [layer.forward(x_in) for layer in self.layers]
+        outputs = [layer.forward(x_in) for layer in self.children]
 
         # Aggregate results
         result = self.aggregation_fn.apply(*outputs)
@@ -60,7 +53,7 @@ class Parallel(Layer):
 
         # Backprop through each layer
         dx_ins = []
-        for i, layer in enumerate(self.layers):
+        for i, layer in enumerate(self.children):
             dx_in = layer.backward(d_outputs[i])
             dx_ins.append(dx_in)
 

@@ -1,20 +1,26 @@
 import mlx.core as mx
 
 from softgrad import Network
-from softgrad.function.core import Add
-from softgrad.layer.core import Parallel, Embedding
-
+from softgrad.function.activation import Relu
+from softgrad.function.core import Add, Concatenate
+from softgrad.layer.attn import CausalSelfAttentionHead
+from softgrad.layer.core import Parallel, Embedding, Sequential, Linear, Residual, Activation
+from softgrad.layer.norm import LayerNorm
+from softgrad.layer.transform.PositionIndices import PositionIndices
 
 with open('rsc/tinyshakespeare.txt', 'r', encoding='utf-8') as f:
     text = f.read()
 
-batch_size = 64 # how many independent sequences will we process in parallel?
-block_size = 256 # what is the maximum context length for predictions?
+batch_size = 64  # how many independent sequences will we process in parallel?
+block_size = 256  # what is the maximum context length for predictions?
 max_iters = 5000
 eval_interval = 100
-learning_rate = 3e-4 # reduce learning rate
+learning_rate = 3e-4  # reduce learning rate
 eval_iters = 200
 n_embd = 768
+n_head = 12  # every head is 64 dimensional
+n_block = 3  # number of transformer blocks
+dropout = 0.2
 
 
 # here are all the unique characters that occur in this text
@@ -43,12 +49,55 @@ def get_batch(split):
     return x, y
 
 
+class FeedForward(Sequential):
+    def __init__(self, n_embd):
+        super().__init__([
+            Linear(4 * n_embd),
+            Activation(Relu()),
+            Linear(n_embd)
+        ])
+
+
+class MultiHeadAttention(Sequential):
+    def __init__(self, num_heads, head_size):
+        super().__init__([
+            Parallel(
+                [CausalSelfAttentionHead(n_embd, head_size, block_size) for _ in range(num_heads)]  # heads
+            , Concatenate()),
+            Linear(n_embd)  # projection
+        ])
+
+
+class TransformerBlock(Sequential):
+    def __init__(self, n_embd, n_head):
+        super().__init__([
+            # communication
+            Residual(Sequential([
+                LayerNorm(),
+                MultiHeadAttention(n_head, n_embd // n_head)
+            ])),
+            # computation
+            Residual(Sequential([
+                LayerNorm(),
+                FeedForward(n_embd)
+            ]))
+        ])
+
+
 network = Network(input_shape=(block_size,))
 
 network.add_layer(Parallel([
-    Embedding(vocab_size, n_embd),      # Semantic encoding
-    Embedding(block_size, n_embd),      # Positional encoding
+    Embedding(vocab_size, n_embd),  # Semantic encoding
+    Sequential([
+        PositionIndices(),
+        Embedding(block_size, n_embd)  # Positional encoding
+    ])
 ], Add()))
+network.add_layer(Sequential(
+    [TransformerBlock(n_embd, n_head) for _ in range(n_block)]  # transformer blocks
+))
+network.add_layer(LayerNorm())
+network.add_layer(Linear(vocab_size))  # LLM head
 
 
 # def generate(self, idx, max_new_tokens):
