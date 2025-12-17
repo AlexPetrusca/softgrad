@@ -4,14 +4,14 @@ from datetime import datetime
 
 import numpy as np
 import mlx.core as mx
-import mlx.nn as nn
 import matplotlib.pyplot as plt
 from PIL import Image
+from mlx import nn
 
 from softgrad import Network
 from softgrad.layer.conv import MaxPool2d, Conv2d
-from softgrad.layer.reshape import Flatten
 from softgrad.layer.shim import MLX
+from softgrad.layer.transform import Flatten
 from softgrad.optim import SGD
 from softgrad.function.activation import leaky_relu, softmax, relu
 from softgrad.function.loss import CrossEntropyLoss, cross_entropy_loss
@@ -161,20 +161,20 @@ def train(train_data, epochs, batch_size=1, test_data=None, cb=None):
     plt.show()
 
 
-train_data, test_data = get_mnist(static=True)
-label_map = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
+# train_data, test_data = get_mnist(static=True)
+# label_map = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
 
 # train_data, test_data = get_fashion_mnist(static=True)
 # label_map = ["T-shirt/top", "Trouser", "Pullover", "Dress", "Coat", "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"]
 
-# train_data, test_data = get_cifar10(static=False)
-# label_map = ["Airplane", "Automobile", "Bird", "Cat", "Deer", "Dog", "Frog", "Horse", "Ship", "Truck"]
+train_data, test_data = get_cifar10(static=False)
+label_map = ["Airplane", "Automobile", "Bird", "Cat", "Deer", "Dog", "Frog", "Horse", "Ship", "Truck"]
 
-network = Network(input_shape=(32, 32, 1))
+network = Network(input_shape=(32, 32, 3))
 
 # conv block 1
-network.add_layer(Conv2d(in_channels=1, out_channels=96, kernel_size=7))
-# network.add_layer(MLX(nn.Conv2d(in_channels=1, out_channels=96, kernel_size=7)))
+network.add_layer(Conv2d(in_channels=3, out_channels=96, kernel_size=7))
+# network.add_layer(MLX(nn.Conv2d(in_channels=3, out_channels=96, kernel_size=7)))
 network.add_layer(Activation(leaky_relu))
 network.add_layer(MaxPool2d(2))
 # network.add_layer(MLX(nn.MaxPool2d(2)))
@@ -196,4 +196,4 @@ optimizer = SGD(eta=0.05, momentum=0.9, weight_decay=0.0005)
 optimizer.bind_loss_fn(cross_entropy_loss)
 optimizer.bind_network(network)
 
-train(train_data, epochs=100, batch_size=1000, test_data=test_data)
+train(train_data, epochs=100, batch_size=128, test_data=test_data)

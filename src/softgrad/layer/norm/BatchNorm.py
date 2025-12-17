@@ -5,22 +5,19 @@ from softgrad.layer import TrainableLayer
 class BatchNorm(TrainableLayer):
     def __init__(self, momentum=0.1, eps=1e-5):
         """
-        Batch Normalization layer.
-
-        Normalizes inputs across the batch dimension, learning scale (gamma)
-        and shift (beta) parameters.
+        Batch Normalization - normalizes over batch (and spatial) dimensions.
 
         Args:
-            momentum: Momentum for running mean/var updates (default: 0.1)
-            eps: Small constant for numerical stability (default: 1e-5)
+            momentum: Running statistics momentum (default: 0.1)
+            eps: Numerical stability constant (default: 1e-5)
         """
         super().__init__()
         self.momentum = momentum
         self.eps = eps
+        self.training = True
 
     def _link(self):
-        # For inputs of shape (H, W, C) or (C,), normalize over all dims except last
-        # Number of features is the last dimension
+        # Determine number of features (last dimension)
         if len(self.input_shape) == 1:
             # 1D: (features,)
             num_features = self.input_shape[0]
@@ -28,113 +25,105 @@ class BatchNorm(TrainableLayer):
             # 2D: (H, W, channels)
             num_features = self.input_shape[2]
         else:
-            raise ValueError(f"BatchNorm only supports 1D or 3D inputs, got {len(self.input_shape)}D")
+            raise ValueError(f"BatchNorm expects 1D or 3D input, got {len(self.input_shape)}D")
 
         self.num_features = num_features
         self.output_shape = self.input_shape
 
-        # Learnable parameters: scale (gamma) and shift (beta)
+        # Learnable parameters
         self.params["gamma"] = mx.ones((num_features,))
         self.params["beta"] = mx.zeros((num_features,))
 
-        # Running statistics (not learnable, updated during training)
+        # Running statistics (not trainable)
         self.running_mean = mx.zeros((num_features,))
         self.running_var = mx.ones((num_features,))
 
     def _forward(self, x_in: mx.array) -> mx.array:
+        """
+        Forward pass.
+
+        Input: (batch, ..., features)
+        Output: (batch, ..., features)
+        """
         if self.training:
-            # Training mode: use batch statistics
+            # Compute statistics over batch (and spatial) dimensions
             if len(self.input_shape) == 1:
-                # 1D input: (batch, features)
-                # Normalize over batch dimension
+                # 1D: normalize over batch
                 axes = (0,)
             else:
-                # 3D input: (batch, H, W, C)
-                # Normalize over batch and spatial dimensions
+                # 2D: normalize over batch and spatial
                 axes = (0, 1, 2)
 
-            # Compute batch mean and variance
+            # Compute batch statistics
             mean = mx.mean(x_in, axis=axes, keepdims=True)
             var = mx.var(x_in, axis=axes, keepdims=True)
 
             # Normalize
-            x_norm = (x_in - mean) / mx.sqrt(var + self.eps)
+            std = mx.sqrt(var + self.eps)
+            x_norm = (x_in - mean) / std
 
             # Scale and shift
             y = self.params["gamma"] * x_norm + self.params["beta"]
 
-            # Update running statistics (exponential moving average)
-            # Squeeze to remove singleton dimensions for storage
-            mean_squeezed = mx.squeeze(mean)
-            var_squeezed = mx.squeeze(var)
+            # Update running statistics
+            mean_scalar = mx.squeeze(mean)
+            var_scalar = mx.squeeze(var)
+            self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean_scalar
+            self.running_var = (1 - self.momentum) * self.running_var + self.momentum * var_scalar
+            # mx.eval(self.running_mean)  # todo: uncomment if running out of resources
+            # mx.eval(self.running_var)  # todo: uncomment if running out of resources
 
-            self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean_squeezed
-            self.running_var = (1 - self.momentum) * self.running_var + self.momentum * var_squeezed
-
-            # Save for backward pass
+            # Cache for backward
             self.ctx['x_norm'] = x_norm
-            self.ctx['mean'] = mean
-            self.ctx['var'] = var
-            self.ctx['std'] = mx.sqrt(var + self.eps)
+            self.ctx['std'] = std
+            self.ctx['axes'] = axes
 
         else:
-            # Inference mode: use running statistics
-            mean = self.running_mean
-            var = self.running_var
-
-            # Normalize using running stats
-            x_norm = (x_in - mean) / mx.sqrt(var + self.eps)
-
-            # Scale and shift
+            # Use running statistics
+            x_norm = (x_in - self.running_mean) / mx.sqrt(self.running_var + self.eps)
             y = self.params["gamma"] * x_norm + self.params["beta"]
 
         return y
 
-    def _backward(self, dx_out: mx.array) -> mx.array:
+    def _backward(self, dy: mx.array) -> mx.array:
+        """
+        Backward pass through batch normalization.
+
+        The key insight: mean and var depend on ALL samples in batch,
+        so gradient must account for this coupling.
+        """
         x_norm = self.ctx['x_norm']
-        mean = self.ctx['mean']
-        var = self.ctx['var']
         std = self.ctx['std']
-        x_in = self.ctx.x_in
+        axes = self.ctx['axes']
 
-        batch_size = x_in.shape[0]
-
-        # Determine normalization axes
+        # Calculate N (number of elements being normalized per feature)
+        batch_size = self.ctx.x_in.shape[0]
         if len(self.input_shape) == 1:
-            axes = (0,)
-            N = batch_size
+            N = float(batch_size)
         else:
-            axes = (0, 1, 2)
-            N = batch_size * self.input_shape[0] * self.input_shape[1]
+            N = float(batch_size * self.input_shape[0] * self.input_shape[1])
 
-        # Gradient w.r.t. gamma
-        self.params["dgamma"] = mx.sum(dx_out * x_norm, axis=axes)
+        # Gradients for learnable parameters
+        self.params["dgamma"] = mx.sum(dy * x_norm, axis=axes)
+        self.params["dbeta"] = mx.sum(dy, axis=axes)
 
-        # Gradient w.r.t. beta
-        self.params["dbeta"] = mx.sum(dx_out, axis=axes)
+        # Gradient for input
+        # Standard BatchNorm backward formula accounting for batch coupling
+        dy_scaled = dy * self.params["gamma"]
 
-        # Gradient w.r.t. input (complex!)
-        # Using the chain rule through the normalization
+        # Compute sums needed for gradient
+        sum_dy = mx.sum(dy_scaled, axis=axes, keepdims=True)
+        sum_dy_xnorm = mx.sum(dy_scaled * x_norm, axis=axes, keepdims=True)
 
-        # dx_norm = gradient w.r.t. normalized input
-        dx_norm = dx_out * self.params["gamma"]
+        # Final gradient
+        dx = (1.0 / N) / std * (N * dy_scaled - sum_dy - x_norm * sum_dy_xnorm)
 
-        # Gradient through normalization (batch-coupled)
-        dx_centered = dx_norm / std
-
-        dvar = mx.sum(dx_norm * (x_in - mean) * -0.5 * mx.power(var + self.eps, -1.5), axis=axes, keepdims=True)
-
-        dmean = mx.sum(dx_norm * -1.0 / std, axis=axes, keepdims=True) + \
-                dvar * mx.sum(-2.0 * (x_in - mean), axis=axes, keepdims=True) / N
-
-        dx_in = dx_centered + dvar * 2.0 * (x_in - mean) / N + dmean / N
-
-        return dx_in
+        return dx
 
     def train(self):
-        """Set layer to training mode."""
+        """Enable training mode."""
         self.training = True
 
     def eval(self):
-        """Set layer to evaluation mode."""
+        """Enable evaluation mode."""
         self.training = False

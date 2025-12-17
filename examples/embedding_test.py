@@ -3,7 +3,7 @@ from softgrad import Network
 from softgrad.function.loss import MSELoss
 from softgrad.layer.core import Embedding, Linear
 from softgrad.layer.norm import LayerNorm
-from softgrad.layer.reshape import Flatten
+from softgrad.layer.transform import Flatten
 from softgrad.optim import SGD
 
 
