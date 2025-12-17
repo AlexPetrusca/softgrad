@@ -49,16 +49,10 @@ class Linear(TrainableLayer):
         input_dim = self.input_shape[-1]
         scale = math.sqrt(1.0 / input_dim)
 
-        self.params["W"] = mx.random.uniform(
-            -scale, scale,
-            shape=(input_dim, self.output_dims)
-        )
+        self.params["W"] = mx.random.uniform(-scale, scale, shape=(input_dim, self.output_dims))
 
         if self.bias:
-            self.params["b"] = mx.random.uniform(
-                -scale, scale,
-                shape=(self.output_dims,)
-            )
+            self.params["b"] = mx.random.uniform(-scale, scale, shape=(self.output_dims,))
 
     def _forward(self, x_in: mx.array) -> mx.array:
         # Matrix multiply on last dimension

@@ -1,4 +1,5 @@
 from softgrad.function.Function import Function
+import mlx.core as mx
 
 class Concatenate(Function):
     @staticmethod

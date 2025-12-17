@@ -30,7 +30,12 @@ class Parallel(RecursiveLayer):
                 f"Got shapes: {output_shapes}"
             )
 
-        self.output_shape = output_shapes[0]
+        dummy_outputs = [
+            mx.zeros((1,) + shape)  # (batch=1, *output_shape)
+            for shape in output_shapes
+        ]
+        dummy_result = self.aggregation_fn.apply(*dummy_outputs)
+        self.output_shape = dummy_result.shape[1:]
 
     def _forward(self, x_in: mx.array) -> mx.array:
         # Execute all layers in parallel

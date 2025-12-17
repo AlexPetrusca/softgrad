@@ -3,11 +3,6 @@ from softgrad.layer import Layer
 
 
 class PositionIndices(Layer):
-    """
-    Generates position indices [0, 1, 2, ...] for sequences.
-    Ignores input content and just outputs position IDs.
-    """
-
     def __init__(self):
         super().__init__()
 
