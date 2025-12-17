@@ -32,4 +32,7 @@ class SGD(Optimizer):
                     param.value = param.value + self.ctx[v_key]
             layer.params.zero_grad()
 
+        # Eval all momentum buffers to clean compuation graphs ; avoid memory leak
+        mx.eval([v for v in self.ctx.values() if isinstance(v, mx.array)])
+
         return grad # gradient for the input

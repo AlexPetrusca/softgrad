@@ -377,7 +377,7 @@ optimizer = SGD(eta=0.05, momentum=0.9, weight_decay=0.0005)
 optimizer.bind_loss_fn(cross_entropy_loss)
 optimizer.bind_network(network)
 
-train(train_data, epochs=100, batch_size=1000, test_data=test_data)
+train(train_data, epochs=100, batch_size=128, test_data=test_data)
 
 
 
@@ -796,198 +796,410 @@ train(train_data, epochs=100, batch_size=1000, test_data=test_data)
 
 
 
-# Epoch 0: Accuracy 0.000, Average Loss 2.410071973800659
-# Epoch 0: Accuracy 0.000, Average Loss 2.4217883825302122
-# 2025-12-17 00:26:15.640918
+# /Users/apetrusca/alpine/_ai_/softgrad/.venv/bin/python /Users/apetrusca/alpine/_ai_/softgrad/examples/resnet_test.py
+# Epoch 0: Accuracy 0.000, Average Loss 2.399763298034668
+# Epoch 0: Accuracy 0.000, Average Loss 2.401701641082764
+# 2025-12-17 10:36:31.128409
 #
-# Epoch 1: Accuracy 0.126, Average Loss 1.6484799933433534
-# Epoch 1: Accuracy 0.161, Average Loss 1.609223973751068
-# 2025-12-17 00:27:14.780027
+# Epoch 1: Accuracy 0.236, Average Loss 1.5185773825645448
+# Epoch 1: Accuracy 0.261, Average Loss 1.4828368782997132
+# 2025-12-17 10:37:24.646979
 #
-# Epoch 2: Accuracy 0.325, Average Loss 1.3321566796302795
-# Epoch 2: Accuracy 0.343, Average Loss 1.3250127196311952
-# 2025-12-17 00:28:13.699045
+# Epoch 2: Accuracy 0.431, Average Loss 1.1891379499435424
+# Epoch 2: Accuracy 0.434, Average Loss 1.205446982383728
+# 2025-12-17 10:38:17.884121
 #
-# Epoch 3: Accuracy 0.428, Average Loss 1.1648745560646057
-# Epoch 3: Accuracy 0.433, Average Loss 1.1822108149528503
-# 2025-12-17 00:29:12.580789
+# Epoch 3: Accuracy 0.509, Average Loss 1.03972771525383
+# Epoch 3: Accuracy 0.504, Average Loss 1.0676378726959228
+# 2025-12-17 10:39:11.867294
 #
-# Epoch 4: Accuracy 0.534, Average Loss 0.9454136312007904
-# Epoch 4: Accuracy 0.533, Average Loss 0.9882292866706848
-# 2025-12-17 00:30:11.543184
+# Epoch 4: Accuracy 0.592, Average Loss 0.860174013376236
+# Epoch 4: Accuracy 0.588, Average Loss 0.8921421766281128
+# 2025-12-17 10:40:05.220416
 #
-# Epoch 5: Accuracy 0.602, Average Loss 0.8632068324089051
-# Epoch 5: Accuracy 0.590, Average Loss 0.9390227496623993
-# 2025-12-17 00:31:14.328471
+# Epoch 5: Accuracy 0.650, Average Loss 0.7279231441020966
+# Epoch 5: Accuracy 0.628, Average Loss 0.7934684693813324
+# 2025-12-17 10:40:59.856261
 #
-# Epoch 6: Accuracy 0.663, Average Loss 0.7269458770751953
-# Epoch 6: Accuracy 0.652, Average Loss 0.7752862691879272
-# 2025-12-17 00:33:35.402715
+# Epoch 6: Accuracy 0.700, Average Loss 0.6505075669288636
+# Epoch 6: Accuracy 0.684, Average Loss 0.7068560302257538
+# 2025-12-17 10:41:55.278633
 #
-# Epoch 7: Accuracy 0.726, Average Loss 0.621644059419632
-# Epoch 7: Accuracy 0.711, Average Loss 0.6796978652477265
-# 2025-12-17 00:34:40.135261
+# Epoch 7: Accuracy 0.732, Average Loss 0.5934058797359466
+# Epoch 7: Accuracy 0.709, Average Loss 0.6646127581596375
+# 2025-12-17 10:42:52.086175
 #
-# Epoch 8: Accuracy 0.737, Average Loss 0.602119414806366
-# Epoch 8: Accuracy 0.721, Average Loss 0.6702426850795746
-# 2025-12-17 00:35:43.367692
+# Epoch 8: Accuracy 0.756, Average Loss 0.5465143877267837
+# Epoch 8: Accuracy 0.732, Average Loss 0.6296410202980042
+# 2025-12-17 10:43:47.327894
 #
-# Epoch 9: Accuracy 0.754, Average Loss 0.5606626462936402
-# Epoch 9: Accuracy 0.725, Average Loss 0.6578136324882508
-# 2025-12-17 00:36:46.552776
+# Epoch 9: Accuracy 0.780, Average Loss 0.5082849872112274
+# Epoch 9: Accuracy 0.749, Average Loss 0.6009266316890717
+# 2025-12-17 10:44:40.810131
 #
-# Epoch 10: Accuracy 0.784, Average Loss 0.4906641572713852
-# Epoch 10: Accuracy 0.762, Average Loss 0.5615911722183228
-# 2025-12-17 00:38:08.378602
+# Epoch 10: Accuracy 0.793, Average Loss 0.479155570268631
+# Epoch 10: Accuracy 0.763, Average Loss 0.5751410245895385
+# 2025-12-17 10:45:34.769019
 #
-# Epoch 11: Accuracy 0.800, Average Loss 0.469146084189415
-# Epoch 11: Accuracy 0.780, Average Loss 0.5357256472110749
-# 2025-12-17 00:39:17.714419
+# Epoch 11: Accuracy 0.802, Average Loss 0.4600864851474762
+# Epoch 11: Accuracy 0.770, Average Loss 0.567835658788681
+# 2025-12-17 10:46:28.446371
 #
-# Epoch 12: Accuracy 0.819, Average Loss 0.4220418727397919
-# Epoch 12: Accuracy 0.792, Average Loss 0.5317607820034027
-# 2025-12-17 00:40:40.175483
+# Epoch 12: Accuracy 0.821, Average Loss 0.42903706431388855
+# Epoch 12: Accuracy 0.781, Average Loss 0.5530341595411301
+# 2025-12-17 10:47:22.644128
 #
-# Epoch 13: Accuracy 0.834, Average Loss 0.39595011472702024
-# Epoch 13: Accuracy 0.804, Average Loss 0.500785619020462
-# 2025-12-17 00:42:03.218140
+# Epoch 13: Accuracy 0.834, Average Loss 0.3903673714399338
+# Epoch 13: Accuracy 0.795, Average Loss 0.5051813185214996
+# 2025-12-17 10:48:16.649001
 #
-# Epoch 14: Accuracy 0.836, Average Loss 0.3858108627796173
-# Epoch 14: Accuracy 0.803, Average Loss 0.4940700173377991
-# 2025-12-17 00:43:21.855757
+# Epoch 14: Accuracy 0.836, Average Loss 0.3800062024593353
+# Epoch 14: Accuracy 0.791, Average Loss 0.5048970103263855
+# 2025-12-17 10:49:10.916579
 #
-# Epoch 15: Accuracy 0.838, Average Loss 0.38728368282318115
-# Epoch 15: Accuracy 0.802, Average Loss 0.504344055056572
-# 2025-12-17 00:44:43.106850
+# Epoch 15: Accuracy 0.861, Average Loss 0.33227994084358214
+# Epoch 15: Accuracy 0.816, Average Loss 0.46857639849185945
+# 2025-12-17 10:50:04.774028
 #
-# Epoch 16: Accuracy 0.848, Average Loss 0.3725249755382538
-# Epoch 16: Accuracy 0.810, Average Loss 0.4984774738550186
-# 2025-12-17 00:46:18.809612
+# Epoch 16: Accuracy 0.858, Average Loss 0.3417918372154236
+# Epoch 16: Accuracy 0.816, Average Loss 0.4789359211921692
+# 2025-12-17 10:50:59.026619
 #
-# Epoch 17: Accuracy 0.858, Average Loss 0.343439484834671
-# Epoch 17: Accuracy 0.816, Average Loss 0.48599493205547334
-# 2025-12-17 00:47:26.971948
+# Epoch 17: Accuracy 0.862, Average Loss 0.3307399809360504
+# Epoch 17: Accuracy 0.814, Average Loss 0.48986607491970063
+# 2025-12-17 10:51:52.640340
 #
-# Epoch 18: Accuracy 0.862, Average Loss 0.33169661700725556
-# Epoch 18: Accuracy 0.811, Average Loss 0.4912333369255066
-# 2025-12-17 00:49:01.617247
+# Epoch 18: Accuracy 0.874, Average Loss 0.3059078195691109
+# Epoch 18: Accuracy 0.818, Average Loss 0.48979044854640963
+# 2025-12-17 10:52:46.862046
 #
-# Epoch 19: Accuracy 0.868, Average Loss 0.3191759449243545
-# Epoch 19: Accuracy 0.821, Average Loss 0.47060473561286925
-# 2025-12-17 00:50:42.232465
+# Epoch 19: Accuracy 0.879, Average Loss 0.29568975627422334
+# Epoch 19: Accuracy 0.825, Average Loss 0.46802301704883575
+# 2025-12-17 10:53:41.096879
 #
-# Epoch 20: Accuracy 0.872, Average Loss 0.31057926774024963
-# Epoch 20: Accuracy 0.824, Average Loss 0.4619213730096817
-# 2025-12-17 00:51:56.941996
+# Epoch 20: Accuracy 0.883, Average Loss 0.2919000652432442
+# Epoch 20: Accuracy 0.833, Average Loss 0.4554599553346634
+# 2025-12-17 10:54:34.436844
 #
-# Epoch 21: Accuracy 0.885, Average Loss 0.28437335669994357
-# Epoch 21: Accuracy 0.831, Average Loss 0.45694270431995393
-# 2025-12-17 00:53:03.201341
+# Epoch 21: Accuracy 0.883, Average Loss 0.2935939663648605
+# Epoch 21: Accuracy 0.828, Average Loss 0.47691793739795685
+# 2025-12-17 10:55:27.962130
 #
-# Epoch 22: Accuracy 0.889, Average Loss 0.27530476987361907
-# Epoch 22: Accuracy 0.839, Average Loss 0.44483602643013
-# 2025-12-17 00:54:04.171196
+# Epoch 22: Accuracy 0.886, Average Loss 0.28496628046035766
+# Epoch 22: Accuracy 0.834, Average Loss 0.477019664645195
+# 2025-12-17 10:56:21.982170
 #
-# Epoch 23: Accuracy 0.895, Average Loss 0.2536059042811394
-# Epoch 23: Accuracy 0.843, Average Loss 0.43469898104667665
-# 2025-12-17 00:55:05.165508
+# Epoch 23: Accuracy 0.896, Average Loss 0.26153313994407656
+# Epoch 23: Accuracy 0.836, Average Loss 0.4667419224977493
+# 2025-12-17 10:57:16.290975
 #
-# Epoch 24: Accuracy 0.888, Average Loss 0.28198642015457154
-# Epoch 24: Accuracy 0.832, Average Loss 0.4831219643354416
-# 2025-12-17 00:56:07.110101
+# Epoch 24: Accuracy 0.893, Average Loss 0.2613766080141067
+# Epoch 24: Accuracy 0.831, Average Loss 0.46871417760849
+# 2025-12-17 10:58:10.372834
 #
-# Epoch 25: Accuracy 0.906, Average Loss 0.2327580401301384
-# Epoch 25: Accuracy 0.851, Average Loss 0.42378042340278627
-# 2025-12-17 00:57:09.162729
+# Epoch 25: Accuracy 0.903, Average Loss 0.24580485254526138
+# Epoch 25: Accuracy 0.842, Average Loss 0.46917031705379486
+# 2025-12-17 10:59:09.194022
 #
-# Epoch 26: Accuracy 0.907, Average Loss 0.2279633328318596
-# Epoch 26: Accuracy 0.848, Average Loss 0.4256903797388077
-# 2025-12-17 00:58:10.055920
+# Epoch 26: Accuracy 0.913, Average Loss 0.21901365578174592
+# Epoch 26: Accuracy 0.848, Average Loss 0.44593915343284607
+# 2025-12-17 11:00:13.087192
 #
-# Epoch 27: Accuracy 0.905, Average Loss 0.23778258860111237
-# Epoch 27: Accuracy 0.847, Average Loss 0.43446103036403655
-# 2025-12-17 00:59:11.206881
+# Epoch 27: Accuracy 0.906, Average Loss 0.23865731418132782
+# Epoch 27: Accuracy 0.839, Average Loss 0.48495192229747774
+# 2025-12-17 11:01:19.671723
 #
-# Epoch 28: Accuracy 0.906, Average Loss 0.2359294494986534
-# Epoch 28: Accuracy 0.846, Average Loss 0.44498705863952637
-# 2025-12-17 01:00:11.734971
+# Epoch 28: Accuracy 0.912, Average Loss 0.21680707663297652
+# Epoch 28: Accuracy 0.844, Average Loss 0.4710092663764954
+# 2025-12-17 11:02:28.929510
 #
-# Epoch 29: Accuracy 0.916, Average Loss 0.20993057608604432
-# Epoch 29: Accuracy 0.853, Average Loss 0.4316540062427521
-# 2025-12-17 01:01:12.230662
+# Epoch 29: Accuracy 0.919, Average Loss 0.19578304171562194
+# Epoch 29: Accuracy 0.846, Average Loss 0.4454454243183136
+# 2025-12-17 11:03:38.210229
 #
-# Epoch 30: Accuracy 0.917, Average Loss 0.20705257952213288
-# Epoch 30: Accuracy 0.850, Average Loss 0.44044279158115385
-# 2025-12-17 01:02:12.512280
+# Epoch 30: Accuracy 0.918, Average Loss 0.19945539712905883
+# Epoch 30: Accuracy 0.851, Average Loss 0.4381631463766098
+# 2025-12-17 11:04:46.844104
 #
-# Epoch 31: Accuracy 0.922, Average Loss 0.19079286545515062
-# Epoch 31: Accuracy 0.854, Average Loss 0.42641997039318086
-# 2025-12-17 01:03:12.795397
+# Epoch 31: Accuracy 0.921, Average Loss 0.20169068455696107
+# Epoch 31: Accuracy 0.845, Average Loss 0.47120547890663145
+# 2025-12-17 11:05:56.442747
 #
-# Epoch 32: Accuracy 0.920, Average Loss 0.19968207508325578
-# Epoch 32: Accuracy 0.857, Average Loss 0.43070337176322937
-# 2025-12-17 01:04:13.212693
+# Epoch 32: Accuracy 0.928, Average Loss 0.17902175486087799
+# Epoch 32: Accuracy 0.851, Average Loss 0.4490579843521118
+# 2025-12-17 11:07:05.445423
 #
-# Epoch 33: Accuracy 0.922, Average Loss 0.19469139695167542
-# Epoch 33: Accuracy 0.858, Average Loss 0.4179409921169281
-# 2025-12-17 01:05:13.597669
+# Epoch 33: Accuracy 0.931, Average Loss 0.1734014083445072
+# Epoch 33: Accuracy 0.857, Average Loss 0.44978311359882356
+# 2025-12-17 11:08:13.488922
 #
-# Epoch 34: Accuracy 0.933, Average Loss 0.1689568826556206
-# Epoch 34: Accuracy 0.860, Average Loss 0.414584743976593
-# 2025-12-17 01:06:13.880726
+# Epoch 34: Accuracy 0.935, Average Loss 0.16954993307590485
+# Epoch 34: Accuracy 0.857, Average Loss 0.47252547442913057
+# 2025-12-17 11:09:24.370185
 #
-# Epoch 35: Accuracy 0.925, Average Loss 0.18490574836730958
-# Epoch 35: Accuracy 0.856, Average Loss 0.4419887840747833
-# 2025-12-17 01:07:14.281383
+# Epoch 35: Accuracy 0.934, Average Loss 0.16634514883160592
+# Epoch 35: Accuracy 0.856, Average Loss 0.47009427547454835
+# 2025-12-17 11:10:36.387218
 #
-# Epoch 36: Accuracy 0.935, Average Loss 0.16385447710752488
-# Epoch 36: Accuracy 0.862, Average Loss 0.4190028578042984
-# 2025-12-17 01:08:14.604845
+# Epoch 36: Accuracy 0.934, Average Loss 0.1637691766023636
+# Epoch 36: Accuracy 0.856, Average Loss 0.44683597087860105
+# 2025-12-17 11:11:44.963701
 #
-# Epoch 37: Accuracy 0.929, Average Loss 0.17648937970399856
-# Epoch 37: Accuracy 0.858, Average Loss 0.42844298481941223
-# 2025-12-17 01:09:15.090974
+# Epoch 37: Accuracy 0.938, Average Loss 0.1575833448767662
+# Epoch 37: Accuracy 0.855, Average Loss 0.47846522331237795
+# 2025-12-17 11:12:38.472289
 #
-# Epoch 38: Accuracy 0.933, Average Loss 0.17063145726919174
-# Epoch 38: Accuracy 0.858, Average Loss 0.4511851370334625
-# 2025-12-17 01:10:15.469371
+# Epoch 38: Accuracy 0.941, Average Loss 0.14906472310423852
+# Epoch 38: Accuracy 0.855, Average Loss 0.4613454341888428
+# 2025-12-17 11:13:33.300007
 #
-# Epoch 39: Accuracy 0.940, Average Loss 0.1527801175415516
-# Epoch 39: Accuracy 0.868, Average Loss 0.4433560073375702
-# 2025-12-17 01:11:15.798894
+# Epoch 39: Accuracy 0.938, Average Loss 0.1561955614387989
+# Epoch 39: Accuracy 0.852, Average Loss 0.4648822218179703
+# 2025-12-17 11:14:27.815558
 #
-# Epoch 40: Accuracy 0.939, Average Loss 0.1525729078054428
-# Epoch 40: Accuracy 0.860, Average Loss 0.4407694756984711
-# 2025-12-17 01:12:16.127030
+# Epoch 40: Accuracy 0.946, Average Loss 0.13530653581023216
+# Epoch 40: Accuracy 0.858, Average Loss 0.44781287014484406
+# 2025-12-17 11:15:21.809470
 #
-# Epoch 41: Accuracy 0.943, Average Loss 0.1472090108692646
-# Epoch 41: Accuracy 0.865, Average Loss 0.4518663793802261
-# 2025-12-17 01:13:16.564321
+# Epoch 41: Accuracy 0.944, Average Loss 0.13917971447110175
+# Epoch 41: Accuracy 0.858, Average Loss 0.4446490824222565
+# 2025-12-17 11:16:15.436530
 #
-# Epoch 42: Accuracy 0.946, Average Loss 0.13465359479188918
-# Epoch 42: Accuracy 0.873, Average Loss 0.41410922110080717
-# 2025-12-17 01:14:17.053517
+# Epoch 42: Accuracy 0.945, Average Loss 0.13955775380134583
+# Epoch 42: Accuracy 0.859, Average Loss 0.4708430618047714
+# 2025-12-17 11:17:09.025117
 #
-# Epoch 43: Accuracy 0.944, Average Loss 0.1435682789981365
-# Epoch 43: Accuracy 0.871, Average Loss 0.44935176372528074
-# 2025-12-17 01:15:17.433078
+# Epoch 43: Accuracy 0.952, Average Loss 0.12219816893339157
+# Epoch 43: Accuracy 0.866, Average Loss 0.44661819338798525
+# 2025-12-17 11:18:29.798099
 #
-# Epoch 44: Accuracy 0.952, Average Loss 0.12263208284974098
-# Epoch 44: Accuracy 0.876, Average Loss 0.42090030014514923
-# 2025-12-17 01:16:17.877931
+# Epoch 44: Accuracy 0.949, Average Loss 0.12907622292637824
+# Epoch 44: Accuracy 0.859, Average Loss 0.4797675132751465
+# 2025-12-17 11:19:58.741744
 #
-# Epoch 45: Accuracy 0.952, Average Loss 0.12341078087687492
-# Epoch 45: Accuracy 0.866, Average Loss 0.44433772563934326
-# 2025-12-17 01:17:18.216929
+# Epoch 45: Accuracy 0.950, Average Loss 0.12860046818852425
+# Epoch 45: Accuracy 0.862, Average Loss 0.4771183133125305
+# 2025-12-17 11:20:53.278071
 #
-# Epoch 46: Accuracy 0.948, Average Loss 0.13215271294116973
-# Epoch 46: Accuracy 0.862, Average Loss 0.46501135230064394
-# 2025-12-17 01:18:18.718918
+# Epoch 46: Accuracy 0.955, Average Loss 0.1136617286503315
+# Epoch 46: Accuracy 0.863, Average Loss 0.47692079842090607
+# 2025-12-17 11:21:48.178563
 #
-# Epoch 47: Accuracy 0.949, Average Loss 0.12979984998703004
-# Epoch 47: Accuracy 0.868, Average Loss 0.45821002721786497
-# 2025-12-17 01:19:19.631988
+# Epoch 47: Accuracy 0.959, Average Loss 0.10839168891310692
+# Epoch 47: Accuracy 0.869, Average Loss 0.46323247253894806
+# 2025-12-17 11:22:42.251696
 #
-# Epoch 48: Accuracy 0.948, Average Loss 0.13398414239287376
-# Epoch 48: Accuracy 0.864, Average Loss 0.47990223467350007
-# 2025-12-17 01:20:20.627924
+# Epoch 48: Accuracy 0.958, Average Loss 0.1048437775671482
+# Epoch 48: Accuracy 0.869, Average Loss 0.4597880125045776
+# 2025-12-17 11:23:36.408120
+#
+# Epoch 49: Accuracy 0.960, Average Loss 0.1054905879497528
+# Epoch 49: Accuracy 0.868, Average Loss 0.46037556529045104
+# 2025-12-17 11:24:30.631966
+#
+# Epoch 50: Accuracy 0.957, Average Loss 0.10930463388562202
+# Epoch 50: Accuracy 0.862, Average Loss 0.48702858984470365
+# 2025-12-17 11:25:24.064543
+#
+# Epoch 51: Accuracy 0.958, Average Loss 0.10850019976496697
+# Epoch 51: Accuracy 0.867, Average Loss 0.4729307770729065
+# 2025-12-17 11:26:17.230279
+#
+# Epoch 52: Accuracy 0.955, Average Loss 0.11672230035066605
+# Epoch 52: Accuracy 0.865, Average Loss 0.48235872089862825
+# 2025-12-17 11:27:10.362393
+#
+# Epoch 53: Accuracy 0.962, Average Loss 0.0994389757514
+# Epoch 53: Accuracy 0.866, Average Loss 0.5067284166812897
+# 2025-12-17 11:28:03.689493
+#
+# Epoch 54: Accuracy 0.961, Average Loss 0.100523322224617
+# Epoch 54: Accuracy 0.864, Average Loss 0.4990663081407547
+# 2025-12-17 11:28:56.868376
+#
+# Epoch 55: Accuracy 0.968, Average Loss 0.08344742849469185
+# Epoch 55: Accuracy 0.877, Average Loss 0.4638302892446518
+# 2025-12-17 11:29:50.023726
+#
+# Epoch 56: Accuracy 0.962, Average Loss 0.09958713300526142
+# Epoch 56: Accuracy 0.870, Average Loss 0.5079587697982788
+# 2025-12-17 11:30:43.073706
+#
+# Epoch 57: Accuracy 0.964, Average Loss 0.09434141144156456
+# Epoch 57: Accuracy 0.871, Average Loss 0.5077556669712067
+# 2025-12-17 11:31:36.038979
+#
+# Epoch 58: Accuracy 0.966, Average Loss 0.08750909656286239
+# Epoch 58: Accuracy 0.876, Average Loss 0.4814422994852066
+# 2025-12-17 11:32:35.795101
+#
+# Epoch 59: Accuracy 0.961, Average Loss 0.1052808864414692
+# Epoch 59: Accuracy 0.866, Average Loss 0.5417987912893295
+# 2025-12-17 11:33:54.281276
+#
+# Epoch 60: Accuracy 0.958, Average Loss 0.10980910524725913
+# Epoch 60: Accuracy 0.865, Average Loss 0.5145908981561661
+# 2025-12-17 11:34:47.647012
+#
+# Epoch 61: Accuracy 0.967, Average Loss 0.08512763872742653
+# Epoch 61: Accuracy 0.875, Average Loss 0.49939723312854767
+# 2025-12-17 11:35:40.860413
+#
+# Epoch 62: Accuracy 0.964, Average Loss 0.09597448572516441
+# Epoch 62: Accuracy 0.864, Average Loss 0.5420180648565293
+# 2025-12-17 11:36:34.403071
+#
+# Epoch 63: Accuracy 0.968, Average Loss 0.08032141506671905
+# Epoch 63: Accuracy 0.871, Average Loss 0.4903275936841965
+# 2025-12-17 11:37:27.594866
+#
+# Epoch 64: Accuracy 0.970, Average Loss 0.07745135925710202
+# Epoch 64: Accuracy 0.871, Average Loss 0.49148730635643006
+# 2025-12-17 11:38:20.920796
+#
+# Epoch 65: Accuracy 0.971, Average Loss 0.07711224615573883
+# Epoch 65: Accuracy 0.875, Average Loss 0.4871603399515152
+# 2025-12-17 11:39:14.342639
+#
+# Epoch 66: Accuracy 0.971, Average Loss 0.07899293042719364
+# Epoch 66: Accuracy 0.878, Average Loss 0.5116829186677933
+# 2025-12-17 11:40:07.763653
+#
+# Epoch 67: Accuracy 0.971, Average Loss 0.07562357731163502
+# Epoch 67: Accuracy 0.876, Average Loss 0.49393502473831175
+# 2025-12-17 11:41:00.781998
+#
+# Epoch 68: Accuracy 0.970, Average Loss 0.07700040303170681
+# Epoch 68: Accuracy 0.870, Average Loss 0.5282128244638443
+# 2025-12-17 11:41:53.691361
+#
+# Epoch 69: Accuracy 0.975, Average Loss 0.06640409380197525
+# Epoch 69: Accuracy 0.872, Average Loss 0.5156196594238281
+# 2025-12-17 11:42:46.838379
+#
+# Epoch 70: Accuracy 0.976, Average Loss 0.06371830254793168
+# Epoch 70: Accuracy 0.877, Average Loss 0.5050972461700439
+# 2025-12-17 11:43:40.372284
+#
+# Epoch 71: Accuracy 0.970, Average Loss 0.08048991471529007
+# Epoch 71: Accuracy 0.869, Average Loss 0.5439565241336822
+# 2025-12-17 11:44:33.815682
+#
+# Epoch 72: Accuracy 0.974, Average Loss 0.06806726828217506
+# Epoch 72: Accuracy 0.875, Average Loss 0.5133730471134186
+# 2025-12-17 11:45:27.182016
+#
+# Epoch 73: Accuracy 0.972, Average Loss 0.07404525876045227
+# Epoch 73: Accuracy 0.869, Average Loss 0.537673482298851
+# 2025-12-17 11:46:20.548940
+#
+# Epoch 74: Accuracy 0.974, Average Loss 0.0686636296659708
+# Epoch 74: Accuracy 0.872, Average Loss 0.5413649380207062
+# 2025-12-17 11:47:14.331541
+#
+# Epoch 75: Accuracy 0.968, Average Loss 0.08574860773980618
+# Epoch 75: Accuracy 0.866, Average Loss 0.5505047559738159
+# 2025-12-17 11:48:07.665020
+#
+# Epoch 76: Accuracy 0.971, Average Loss 0.07691219992935658
+# Epoch 76: Accuracy 0.871, Average Loss 0.5231620579957962
+# 2025-12-17 11:49:01.341687
+#
+# Epoch 77: Accuracy 0.979, Average Loss 0.056685169860720634
+# Epoch 77: Accuracy 0.878, Average Loss 0.523070615530014
+# 2025-12-17 11:49:54.639582
+#
+# Epoch 78: Accuracy 0.978, Average Loss 0.05792125709354878
+# Epoch 78: Accuracy 0.876, Average Loss 0.5241350173950196
+# 2025-12-17 11:50:47.763432
+#
+# Epoch 79: Accuracy 0.982, Average Loss 0.04919388066977262
+# Epoch 79: Accuracy 0.883, Average Loss 0.5373786062002182
+# 2025-12-17 11:51:41.173441
+#
+# Epoch 80: Accuracy 0.979, Average Loss 0.05900942452251911
+# Epoch 80: Accuracy 0.875, Average Loss 0.5581758260726929
+# 2025-12-17 11:52:34.506130
+#
+# Epoch 81: Accuracy 0.981, Average Loss 0.051392066143453125
+# Epoch 81: Accuracy 0.877, Average Loss 0.5572047501802444
+# 2025-12-17 11:53:27.540004
+#
+# Epoch 82: Accuracy 0.984, Average Loss 0.042202875092625616
+# Epoch 82: Accuracy 0.878, Average Loss 0.5305818527936935
+# 2025-12-17 11:54:20.683456
+#
+# Epoch 83: Accuracy 0.980, Average Loss 0.05373537693172693
+# Epoch 83: Accuracy 0.873, Average Loss 0.5764262020587921
+# 2025-12-17 11:55:14.077477
+#
+# Epoch 84: Accuracy 0.984, Average Loss 0.042791818454861644
+# Epoch 84: Accuracy 0.882, Average Loss 0.5354415953159333
+# 2025-12-17 11:56:07.267599
+#
+# Epoch 85: Accuracy 0.982, Average Loss 0.04640121091157198
+# Epoch 85: Accuracy 0.881, Average Loss 0.5431466609239578
+# 2025-12-17 11:57:00.802656
+#
+# Epoch 86: Accuracy 0.985, Average Loss 0.03974864199757576
+# Epoch 86: Accuracy 0.879, Average Loss 0.5307063698768616
+# 2025-12-17 11:57:54.229068
+#
+# Epoch 87: Accuracy 0.985, Average Loss 0.040793640576303004
+# Epoch 87: Accuracy 0.878, Average Loss 0.5603337317705155
+# 2025-12-17 11:58:47.775768
+#
+# Epoch 88: Accuracy 0.986, Average Loss 0.03762641873210668
+# Epoch 88: Accuracy 0.883, Average Loss 0.5402174890041351
+# 2025-12-17 11:59:41.176640
+#
+# Epoch 89: Accuracy 0.987, Average Loss 0.036084131821990016
+# Epoch 89: Accuracy 0.883, Average Loss 0.5511980265378952
+# 2025-12-17 12:00:34.346553
+#
+# Epoch 90: Accuracy 0.986, Average Loss 0.03745948359370232
+# Epoch 90: Accuracy 0.884, Average Loss 0.5509742081165314
+# 2025-12-17 12:01:27.332858
+#
+# Epoch 91: Accuracy 0.984, Average Loss 0.0452014135196805
+# Epoch 91: Accuracy 0.882, Average Loss 0.5684744834899902
+# 2025-12-17 12:02:20.316541
+#
+# Epoch 92: Accuracy 0.985, Average Loss 0.041361701153218744
+# Epoch 92: Accuracy 0.883, Average Loss 0.5559793978929519
+# 2025-12-17 12:03:13.342781
+#
+# Epoch 93: Accuracy 0.988, Average Loss 0.0320158464461565
+# Epoch 93: Accuracy 0.882, Average Loss 0.5313341796398163
+# 2025-12-17 12:04:06.315664
+#
+# Epoch 94: Accuracy 0.987, Average Loss 0.033663969039916995
+# Epoch 94: Accuracy 0.883, Average Loss 0.5574939757585525
+# 2025-12-17 12:04:59.282450
+#
+# Epoch 95: Accuracy 0.987, Average Loss 0.03368118664249778
+# Epoch 95: Accuracy 0.887, Average Loss 0.549571442604065
+# 2025-12-17 12:05:52.549688
+#
+# Epoch 96: Accuracy 0.984, Average Loss 0.042790349759161475
+# Epoch 96: Accuracy 0.879, Average Loss 0.5814576387405396
+# 2025-12-17 12:06:45.848776
+#
+# Epoch 97: Accuracy 0.986, Average Loss 0.03859481628984213
+# Epoch 97: Accuracy 0.881, Average Loss 0.5682190507650375
+# 2025-12-17 12:07:38.860731
+#
+# Epoch 98: Accuracy 0.986, Average Loss 0.04047925181686878
+# Epoch 98: Accuracy 0.884, Average Loss 0.569600087404251
+# 2025-12-17 12:08:31.852451
+#
+# Epoch 99: Accuracy 0.987, Average Loss 0.03499506263062358
+# Epoch 99: Accuracy 0.887, Average Loss 0.5387698411941528
+# 2025-12-17 12:09:24.789652
+#
+# Epoch 100: Accuracy 0.987, Average Loss 0.03684636894613504
+# Epoch 100: Accuracy 0.885, Average Loss 0.5612133920192719
+# 2025-12-17 12:10:17.774149
+#
+# Accuracy 0.885, Average Loss 0.5612133920192719
+

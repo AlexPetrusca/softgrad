@@ -70,8 +70,7 @@ class BatchNorm(TrainableLayer):
             var_scalar = mx.squeeze(var)
             self.running_mean = (1 - self.momentum) * self.running_mean + self.momentum * mean_scalar
             self.running_var = (1 - self.momentum) * self.running_var + self.momentum * var_scalar
-            # mx.eval(self.running_mean)  # todo: uncomment if running out of resources
-            # mx.eval(self.running_var)  # todo: uncomment if running out of resources
+            mx.eval([self.running_mean, self.running_var])  # evaluate to clean up computation graphs ; avoid memory leak
 
             # Cache for backward
             self.ctx['x_norm'] = x_norm
