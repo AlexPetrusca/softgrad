@@ -16,10 +16,13 @@ class MLX(TrainableLayer):
         self.param_grad_fn = nn.value_and_grad(self.layer, loss_fn)
 
     # pull parameter from mlx layer into framework
-    def pull_parameter(self, key: str, value: dict | mx.array):
+    def pull_parameter(self, key: str, value: dict | list | mx.array):
         if isinstance(value, dict):
             for subkey, subvalue in value.items():
                 self.pull_parameter(f'{key}.{subkey}', subvalue)
+        elif isinstance(value, list):
+            for (i, subvalue) in enumerate(value):
+                self.pull_parameter(f'{key}.{i}', subvalue)
         else:
             self.params[key] = value
 
@@ -29,7 +32,11 @@ class MLX(TrainableLayer):
 
         cur = self.layer
         for k in path[:-1]:
-            cur = cur[k]
+            if k.isdigit():
+                cur = cur[int(k)]  # index list
+            else:
+                cur = cur[k]   # index dict
+
         cur[path[-1]] = value
 
     def _link(self) -> None:
