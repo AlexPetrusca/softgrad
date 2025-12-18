@@ -3,15 +3,20 @@ import numpy as np
 from mlx import core as mx
 from softgrad.layer import TrainableLayer
 
+# todo: look into fixing impl later
+#   - but this layer is so slow; useless for now
+#   - try running pytorch_gpt_test.py to debug
 class PyTorch(TrainableLayer):
     mps_device = tc.device("mps")
 
-    def __init__(self, layer: tc.nn.Module):
+    def __init__(self, layer: tc.nn.Module, dtype = tc.float32):
         super().__init__()
         self.layer: tc.nn.Module = layer.to(PyTorch.mps_device)
+        self.dtype = dtype
+        tc.set_default_device("mps")
 
     def _link(self) -> None:
-        x_in = tc.zeros((1, *self.input_shape), device=PyTorch.mps_device)
+        x_in = tc.zeros((1, *self.input_shape), device=PyTorch.mps_device, dtype=self.dtype)
         x_out = self.layer(x_in)
         self.output_shape = tuple(x_out.shape[1:])
 
@@ -44,8 +49,14 @@ class PyTorch(TrainableLayer):
 
     @staticmethod
     def mlx2torch(x: mx.array) -> tc.Tensor:
-        return tc.tensor(np.array(x), device=PyTorch.mps_device, requires_grad=True)
+        try:
+            return tc.tensor(np.array(x), device=PyTorch.mps_device, requires_grad=True)
+        except RuntimeError:
+            return tc.tensor(np.array(x), device=PyTorch.mps_device)
 
     @staticmethod
     def torch2mlx(x: tc.Tensor) -> mx.array:
-        return mx.array(x.cpu().detach().numpy())
+        if x is not None:
+            return mx.array(x.cpu().detach().numpy())
+        else:
+            return None

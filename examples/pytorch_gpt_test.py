@@ -1,9 +1,9 @@
-import datetime
+import torch
+import torch.nn as nn
+from torch.nn import functional as F
 import time
 
 import mlx.core as mx
-import matplotlib.pyplot as plt
-import numpy as np
 
 from softgrad import Network
 from softgrad.function.activation import Relu, Softmax, softmax
@@ -12,43 +12,136 @@ from softgrad.function.loss import CrossEntropyLoss
 from softgrad.layer.attn import CausalSelfAttentionHead
 from softgrad.layer.core import Parallel, Embedding, Sequential, Linear, Residual, Activation
 from softgrad.layer.norm import LayerNorm
+from softgrad.layer.shim import MLX, PyTorch
 from softgrad.layer.transform.PositionIndices import PositionIndices
 from softgrad.optim import SGD
 
+class Head(nn.Module):
+    """ one head of self-attention """
 
-class FeedForward(Sequential):
-    def __init__(self, n_embd):
-        super().__init__([
-            Linear(4 * n_embd),
-            Activation(Relu()),
-            Linear(n_embd)
-        ])
+    def __init__(self, head_size):
+        super().__init__()
+        self.head_size = head_size
+        self.key = nn.Linear(n_embd, head_size, bias=False)
+        self.query = nn.Linear(n_embd, head_size, bias=False)
+        self.value = nn.Linear(n_embd, head_size, bias=False)
+        self.register_buffer('tril', torch.tril(torch.ones(block_size, block_size)))
+        self.dropout = nn.Dropout(dropout)
 
+    def forward(self, x):
+        B, T, C = x.shape
+        k = self.key(x)  # (B, T, head_size)
+        q = self.query(x)  # (B, T, head_size)
+        # compute attention scores ("affinities")
+        wei_logits = q @ k.transpose(-2, -1) * self.head_size**-0.5  # (B, T, head_size) @ (B, head_size, T)  -->  (B, T, T)
+        wei_logits = wei_logits.masked_fill(self.tril[:T, :T] == 0, float('-inf'))  # (B, T, T)
+        wei = F.softmax(wei_logits, dim=-1)
+        wei = self.dropout(wei)  # prevent some of the nodes from communicating with dropout (avoids overfitting) (creates ensemble)
+        # perform the weighted aggregation of the values
+        v = self.value(x)  # (B, T, head_size)
+        out = wei @ v  # (B, T, T) @ (B, T, head_size)  -->  (B, T, head_size)
+        return out
 
-class MultiHeadAttention(Sequential):
+class MultiHeadAttention(nn.Module):
+    """ multiple heads of self-attention in parallel """
+
     def __init__(self, num_heads, head_size):
-        super().__init__([
-            Parallel(
-                [CausalSelfAttentionHead(n_embd, head_size, block_size) for _ in range(num_heads)]  # heads
-            , Concatenate()),
-            Linear(n_embd)  # projection
-        ])
+        super().__init__()
+        self.heads = nn.ModuleList([Head(head_size) for _ in range(num_heads)])  # heads of attention
+        self.proj = nn.Linear(n_embd, n_embd)  # "projection back into the residual pathway"
+        self.dropout = nn.Dropout(dropout)
 
+    def forward(self, x):
+        out = torch.cat([h(x) for h in self.heads], dim=-1)  # concatenate over the channel dimension (B, T, C)
+        out = self.proj(out)  # "project back into the residual pathway"
+        out = self.dropout(out)   # apply droupout on residual path
+        return out
 
-class TransformerBlock(Sequential):
+class FeedForward(nn.Module):
+    """ a simple linear layer followed by a non-linearity """
+    def __init__(self, n_embd):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(n_embd, 4 * n_embd),
+            nn.ReLU(),
+        )
+        self.proj = nn.Linear(4 * n_embd, n_embd)  # "project back into the residual pathway"
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x):
+        out = self.net(x)
+        out = self.proj(out)  # "project back into the residual pathway"
+        out = self.dropout(out)  # apply droupout on residual path
+        return out
+
+class TransformerBlock(nn.Module):
+    """ Transformer block: communication followed by computation """
+
     def __init__(self, n_embd, n_head):
-        super().__init__([
-            # communication
-            Residual(Sequential([
-                LayerNorm(),
-                MultiHeadAttention(n_head, n_embd // n_head)
-            ])),
-            # computation
-            Residual(Sequential([
-                LayerNorm(),
-                FeedForward(n_embd)
-            ]))
-        ])
+        # n_embd: embedding dimension, n_head: the number of heads we'd like
+        super().__init__()
+        head_size = n_embd // n_head
+        self.sa = MultiHeadAttention(n_head, head_size)
+        self.ffwd = FeedForward(n_embd)  # feed forward per token (cuz applies only to last dimension)
+        self.ln1 = nn.LayerNorm(n_embd)  # batch norm per token (cuz applies only to last dimension)
+        self.ln2 = nn.LayerNorm(n_embd)  # batch norm per token (cuz applies only to last dimension)
+
+    def forward(self, x):
+        # `x = x + <some computation>` is the residual pathway...
+        x = x + self.sa(self.ln1(x))  # MultiHeadAttention now also "projects back into the residual pathway"
+        x = x + self.ffwd(self.ln2(x))  # FeedForward now also "projects back into the residual pathway"
+        return x
+
+# super simple bigram model
+class BigramLanguageModel(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+        # each token directly reads off the logits for the next token from a lookup table
+        self.token_embedding_table = nn.Embedding(vocab_size, n_embd)  # token information (in token embedding space)
+        self.position_embedding_table = nn.Embedding(block_size, n_embd)  # positional information (in position embedding space)
+        self.blocks = nn.Sequential(*[TransformerBlock(n_embd, n_head) for _ in range(n_transformer_blocks)])
+        self.ln_f = nn.LayerNorm(n_embd) # final layer norm
+        self.lm_head = nn.Linear(n_embd, vocab_size)  # embedding space --> vocabulary space
+
+    def forward(self, idx, targets=None):
+        B, T = idx.shape
+
+        # idx and targets are both (B, T) tensor of integers
+        tok_emb = self.token_embedding_table(idx) # (B, T, C)
+        pos_emb = self.position_embedding_table(torch.arange(T)) # (T, C)
+        x = tok_emb + pos_emb # (B, T, C)
+        x = self.blocks(x) # (B, T, C)
+        x = self.ln_f(x)  # (B, T, C)
+        logits = self.lm_head(x) # (B, T, vocab_size)
+
+        if targets is None:
+            loss = None
+        else:
+            B, T, C = logits.shape
+            logits = logits.view(B*T, C)
+            targets = targets.view(B*T)
+            loss = F.cross_entropy(logits, targets)
+
+        return logits
+
+    def generate(self, idx, max_new_tokens):
+        # idx is (B, T) array of indices in the current context
+        for _ in range(max_new_tokens):
+            # crop idx (B, T) array of indices in the current context
+            # (never pass more than block_size tokens)
+            idx_cond = idx[:, -block_size:]
+            # get the predictions
+            logits, loss = self(idx_cond)
+            # focus only on the last time step
+            logits = logits[:, -1, :] # becomes (B, C)
+            # apply softmax to get probabilities
+            probs = F.softmax(logits, dim=-1) # (B, C)
+            # sample from the distribution
+            idx_next = torch.multinomial(probs, num_samples=1) # (B, 1)
+            # append sampled index to the running sequence
+            idx = torch.cat((idx, idx_next), dim=1) # (B, T+1)
+        return idx
 
 
 # --------------------------------------------------------------------------
@@ -76,16 +169,6 @@ class CharTokenizer:
     def decode(self, indices):
         """Convert list of integers to text."""
         return ''.join([self.idx_to_char[i] for i in indices])
-
-
-def viz_history(history, figsize=(6, 4)):
-    plt.figure(figsize=figsize, num="Loss Curves")
-    plt.plot(history['epoch'], history['train_loss'], 'black', linewidth=2.0)
-    plt.plot(history['epoch'], history['test_loss'], 'green', linewidth=2.0)
-    plt.legend(['Training Loss', 'Validation Loss'], fontsize=14)
-    plt.xlabel('Epochs', fontsize=10)
-    plt.ylabel('Loss', fontsize=10)
-    plt.title('Loss vs Epoch', fontsize=12)
 
 
 def load_shakespeare():
@@ -126,7 +209,7 @@ def train(
         block_size=256,
         batch_size=64,
         epochs=100,
-        learning_rate=0.0001,
+        learning_rate=0.001,
         eval_interval=10,
         eval_batches=10
 ):
@@ -156,8 +239,7 @@ def train(
             optimizer.step(x_batch, y_onehot)
 
             # Log progress
-            # if step % eval_interval == 0:
-            if True:
+            if step % eval_interval == 0:
                 # Evaluate on validation set
                 network.eval()
                 val_losses = []
@@ -281,12 +363,20 @@ def generate_sample(network, tokenizer, block_size, prompt="ROMEO:", max_tokens=
 
 if __name__ == "__main__":
     # Hyperparameters
-    block_size = 256  # Context length
-    batch_size = 64  # Batch size
-    n_embd = 384  # Embedding dimension
-    n_head = 6  # Number of attention heads
-    n_block = 3  # Number of transformer blocks
-    learning_rate = 3e-4  # Learning rate
+    # block_size = 256  # Context length
+    # batch_size = 64  # Batch size
+    # n_embd = 384  # Embedding dimension
+    # n_head = 6  # Number of attention heads
+    # n_block = 3  # Number of transformer blocks
+
+    # hyperparameters
+    batch_size = 32  # how many independent sequences will we process in parallel?
+    block_size = 512  # what is the maximum context length for predictions?
+    n_embd = 768
+    n_head = 12  # every head is 64 dimensional
+    n_transformer_blocks = 12
+    dropout = 0.2
+    learning_rate = 3e-5  # Learning rate
     epochs = 50  # Training epochs
 
     # Load data
@@ -311,18 +401,7 @@ if __name__ == "__main__":
     # Build model
     print("\nBuilding model...")
     network = Network(input_shape=(block_size,))
-    network.add_layer(Parallel([
-        Embedding(vocab_size, n_embd),  # Semantic encoding
-        Sequential([
-            PositionIndices(),
-            Embedding(block_size, n_embd)  # Positional encoding
-        ])
-    ], Add()))
-    network.add_layer(Sequential(
-        [TransformerBlock(n_embd, n_head) for _ in range(n_block)]  # transformer blocks
-    ))
-    network.add_layer(LayerNorm())
-    network.add_layer(Linear(vocab_size))  # LLM head
+    network.add_layer(PyTorch(BigramLanguageModel()))
     print(f"Model built with {vocab_size} vocab size")
 
     # Train
@@ -336,7 +415,7 @@ if __name__ == "__main__":
         batch_size=batch_size,
         epochs=epochs,
         learning_rate=learning_rate,
-        eval_interval=100,
+        eval_interval=50,
         eval_batches=20
     )
 

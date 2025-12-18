@@ -1,208 +1,231 @@
-# train the model
-
+# MLX implementation of a GPT-style transformer
+# Converted from PyTorch to MLX for Apple Silicon optimization
 from datetime import datetime
 
-import numpy as np
 import mlx.core as mx
-import matplotlib.pyplot as plt
-from PIL import Image
-from mlx import nn
+import mlx.nn as nn
+import mlx.optimizers as optim
+import numpy as np
 
-from softgrad import Network
-from softgrad.layer.conv import MaxPool2d, Conv2d
-from softgrad.layer.shim import MLX
-from softgrad.layer.transform import Flatten
-from softgrad.optim import SGD
-from softgrad.function.activation import leaky_relu, softmax, relu
-from softgrad.function.loss import CrossEntropyLoss, cross_entropy_loss
-from softgrad.layer.core import Linear, Activation
+mx.random.seed(1337)
 
-from util.dataset import get_mnist, get_fashion_mnist, get_cifar10
+# hyperparameters
+batch_size = 64
+block_size = 256
+max_iters = 5000
+eval_interval = 100
+learning_rate = 3e-4
+eval_iters = 200
+n_embd = 768
+n_head = 6
+n_transformer_blocks = 6
+dropout = 0.2
 
+# Load and prepare data
+with open('rsc/tinyshakespeare.txt', 'r', encoding='utf-8') as f:
+    text = f.read()
 
-# Visualize
-def viz_sample_predictions(network, test_data, label_map, rows=5, cols=5, figsize=(10, 10)):
-    fig, axes = plt.subplots(rows, cols, figsize=figsize, num="Sample Predictions")
-    axes = axes.reshape(-1)  # flatten
+chars = sorted(list(set(text)))
+vocab_size = len(chars)
+stoi = {ch: i for i, ch in enumerate(chars)}
+itos = {i: ch for i, ch in enumerate(chars)}
+encode = lambda s: [stoi[c] for c in s]
+decode = lambda l: ''.join([itos[i] for i in l])
 
-    test_data = test_data.to_buffer().shuffle()
-    def sample_random():
-        for j in np.arange(0, rows * cols):
-            i = np.random.randint(0, len(test_data))
-            x = mx.array(test_data[i]['image'])
-            y = mx.array(test_data[i]['label'])
-            y_pred = network.forward(x[mx.newaxis, ...])
-
-            sample = np.array(255 * x)
-            if sample.shape[2] == 3:
-                image = Image.fromarray(sample.astype('uint8'))
-            else:
-                image = Image.fromarray(sample.reshape(sample.shape[0], sample.shape[1]))
-
-            raw_label = mx.argmax(y).item()
-            label = label_map[raw_label]
-
-            raw_pred = mx.argmax(y_pred).item()
-            pred = label_map[raw_pred]
-
-            axes[j].imshow(image)
-            axes[j].set_title(f"True: {label} \nPredict: {pred}")
-            axes[j].axis('off')
-            plt.subplots_adjust(wspace=1)
-
-    def on_key(event):
-        if event.key == ' ':
-            sample_random()
-            fig.show()
-
-    fig.canvas.mpl_connect('key_press_event', on_key)
-
-    sample_random()
+# Train and test splits
+data = mx.array(encode(text))
+n = int(0.9 * len(data))
+train_data = data[:n]
+val_data = data[n:]
 
 
-def viz_history(history, figsize=(6, 4)):
-    plt.figure(figsize=figsize, num="Loss Curves")
-    plt.plot(history['epoch'], history['train_loss'], 'black', linewidth=2.0)
-    plt.plot(history['epoch'], history['test_loss'], 'green', linewidth=2.0)
-    plt.legend(['Training Loss', 'Validation Loss'], fontsize=14)
-    plt.xlabel('Epochs', fontsize=10)
-    plt.ylabel('Loss', fontsize=10)
-    plt.title('Loss vs Epoch', fontsize=12)
-
-    plt.figure(figsize=figsize, num="Accuracy Curves")
-    plt.plot(history['epoch'], history['train_accuracy'], 'black', linewidth=2.0)
-    plt.plot(history['epoch'], history['test_accuracy'], 'green', linewidth=2.0)
-    plt.legend(['Training Accuracy', 'Validation Accuracy'], fontsize=14)
-    plt.xlabel('Epochs', fontsize=10)
-    plt.ylabel('Accuracy', fontsize=10)
-    plt.title('Accuracy vs Epoch', fontsize=12)
+def get_batch(split):
+    data = train_data if split == 'train' else val_data
+    ix = mx.random.randint(0, len(data) - block_size, (batch_size,))
+    x = mx.stack([data[int(i):int(i) + block_size] for i in ix])
+    y = mx.stack([data[int(i) + 1:int(i) + block_size + 1] for i in ix])
+    return x, y
 
 
-# Evaluate
-def eval_model(model, dataset, epoch=None):
-    mean_losses = []
-    accuracies = []
-    predictions = []
+class Head(nn.Module):
+    """One head of self-attention"""
 
-    for batch in dataset:
-        x_batch = mx.array(batch["image"])
-        y_batch = mx.array(batch["label"])
+    def __init__(self, head_size):
+        super().__init__()
+        self.head_size = head_size
+        self.key = nn.Linear(n_embd, head_size, bias=False)
+        self.query = nn.Linear(n_embd, head_size, bias=False)
+        self.value = nn.Linear(n_embd, head_size, bias=False)
+        self.dropout = nn.Dropout(dropout)
 
-        y_pred = model.forward(x_batch)
-        predictions.append(y_pred)
+    def __call__(self, x):
+        B, T, C = x.shape
+        k = self.key(x)
+        q = self.query(x)
 
-        loss = optimizer.loss_fn(y_pred, y_batch)
-        mean_loss = mx.mean(mx.sum(loss, axis=1))
-        mean_losses.append(mean_loss.item())
+        # Compute attention scores
+        wei_logits = (q @ k.transpose(0, 2, 1)) * (self.head_size ** -0.5)
 
-        if isinstance(optimizer.loss_fn, CrossEntropyLoss):
-            y_pred = softmax(y_pred)
+        # Causal mask
+        mask = mx.tril(mx.ones((T, T)))
+        wei_logits = mx.where(mask[:T, :T] == 0, float('-inf'), wei_logits)
 
-        errors = mx.sum(mx.abs(y_batch - mx.round(y_pred)), axis=1)
-        accuracy = mx.sum(errors == 0) / y_batch.shape[0]
-        accuracies.append(accuracy.item())
+        wei = mx.softmax(wei_logits, axis=-1)
+        wei = self.dropout(wei)
 
-    mean_loss = sum(mean_losses) / len(mean_losses)
-    accuracy = sum(accuracies) / len(accuracies)
-    predictions = np.concatenate(predictions)
-
-    dataset.reset()
-
-    if epoch is not None:
-        print(f"Epoch {epoch}: Accuracy {accuracy:.3f}, Average Loss {mean_loss}")
-    else:
-        print(f"Accuracy {accuracy:.3f}, Average Loss {mean_loss}")
-
-    return predictions, accuracy, mean_loss
+        v = self.value(x)
+        out = wei @ v
+        return out
 
 
-def debug_memory():
-    print(f"{'='*50}")
-    print(f"{datetime.now()}")
-    print(f"Active: {mx.get_active_memory() / 1e6:.2f} MB")
-    print(f"Peak:   {mx.get_peak_memory() / 1e6:.2f} MB")
-    print(f"Cache:  {mx.get_cache_memory() / 1e6:.2f} MB")
-    print(f"{'='*50}\n")
+class MultiHeadAttention(nn.Module):
+    """Multiple heads of self-attention in parallel"""
+
+    def __init__(self, num_heads, head_size):
+        super().__init__()
+        self.heads = [Head(head_size) for _ in range(num_heads)]
+        self.proj = nn.Linear(n_embd, n_embd)
+        self.dropout = nn.Dropout(dropout)
+
+    def __call__(self, x):
+        out = mx.concatenate([h(x) for h in self.heads], axis=-1)
+        out = self.proj(out)
+        out = self.dropout(out)
+        return out
 
 
-def train(train_data, epochs, batch_size=1, test_data=None, cb=None):
-    batched_train_data = train_data.batch(batch_size)
-    batched_test_data = test_data.batch(batch_size)
+class FeedForward(nn.Module):
+    """A simple linear layer followed by a non-linearity"""
 
-    def train_epoch():
-        for batch in batched_train_data:
-            x_batch = mx.array(batch["image"])
-            y_batch = mx.array(batch["label"])
-            optimizer.step(x_batch, y_batch)
-        batched_train_data.reset()
+    def __init__(self, n_embd):
+        super().__init__()
+        self.linear1 = nn.Linear(n_embd, 4 * n_embd)
+        self.linear2 = nn.Linear(4 * n_embd, n_embd)
+        self.dropout = nn.Dropout(dropout)
 
-    history = {"epoch": [], "train_loss": [], "test_loss": [], "train_accuracy": [], "test_accuracy": []}
-
-    _, train_accuracy, train_loss = eval_model(network, batched_train_data, epoch=0)
-    _, test_accuracy, test_loss = eval_model(network, batched_test_data, epoch=0)
-    debug_memory()
-    print()
-    history["epoch"].append(0)
-    history["train_loss"].append(train_loss)
-    history["test_loss"].append(test_loss)
-    history["train_accuracy"].append(train_accuracy)
-    history["test_accuracy"].append(test_accuracy)
-
-    for epoch in range(1, epochs + 1):
-        train_epoch()
-
-        _, train_accuracy, train_loss = eval_model(network, batched_train_data, epoch=epoch)
-        _, test_accuracy, test_loss = eval_model(network, batched_test_data, epoch=epoch)
-        debug_memory()
-        print()
-        history["epoch"].append(epoch)
-        history["train_loss"].append(train_loss)
-        history["test_loss"].append(test_loss)
-        history["train_accuracy"].append(train_accuracy)
-        history["test_accuracy"].append(test_accuracy)
-
-    test_data.reset()
-    eval_model(network, batched_test_data)
-    print()
-
-    viz_sample_predictions(network, test_data, label_map)
-    viz_history(history)
-    plt.show()
+    def __call__(self, x):
+        x = self.linear1(x)
+        x = nn.relu(x)
+        x = self.linear2(x)
+        x = self.dropout(x)
+        return x
 
 
-# train_data, test_data = get_mnist(static=True)
-# label_map = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"]
+class TransformerBlock(nn.Module):
+    """Transformer block: communication followed by computation"""
 
-# train_data, test_data = get_fashion_mnist(static=True)
-# label_map = ["T-shirt/top", "Trouser", "Pullover", "Dress", "Coat", "Sandal", "Shirt", "Sneaker", "Bag", "Ankle boot"]
+    def __init__(self, n_embd, n_head):
+        super().__init__()
+        head_size = n_embd // n_head
+        self.sa = MultiHeadAttention(n_head, head_size)
+        self.ffwd = FeedForward(n_embd)
+        self.ln1 = nn.LayerNorm(n_embd)
+        self.ln2 = nn.LayerNorm(n_embd)
 
-train_data, test_data = get_cifar10(static=False)
-label_map = ["Airplane", "Automobile", "Bird", "Cat", "Deer", "Dog", "Frog", "Horse", "Ship", "Truck"]
+    def __call__(self, x):
+        x = x + self.sa(self.ln1(x))
+        x = x + self.ffwd(self.ln2(x))
+        return x
 
-network = Network(input_shape=(32, 32, 3))
 
-# conv block 1
-network.add_layer(Conv2d(in_channels=3, out_channels=96, kernel_size=7))
-# network.add_layer(MLX(nn.Conv2d(in_channels=3, out_channels=96, kernel_size=7)))
-network.add_layer(Activation(leaky_relu))
-network.add_layer(MaxPool2d(2))
-# network.add_layer(MLX(nn.MaxPool2d(2)))
+class BigramLanguageModel(nn.Module):
+    """GPT-style language model"""
 
-# conv block 2
-network.add_layer(Conv2d(in_channels=96, out_channels=256, kernel_size=3))
-# network.add_layer(MLX(nn.Conv2d(in_channels=96, out_channels=256, kernel_size=3)))
-network.add_layer(Activation(leaky_relu))
-network.add_layer(MaxPool2d(2))
-# network.add_layer(MLX(nn.MaxPool2d(2)))
+    def __init__(self):
+        super().__init__()
+        self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
+        self.position_embedding_table = nn.Embedding(block_size, n_embd)
+        self.blocks = [TransformerBlock(n_embd, n_head) for _ in range(n_transformer_blocks)]
+        self.ln_f = nn.LayerNorm(n_embd)
+        self.lm_head = nn.Linear(n_embd, vocab_size)
 
-# feed forward
-network.add_layer(Flatten())
-network.add_layer(Linear(1024))
-network.add_layer(Activation(leaky_relu))
-network.add_layer(Linear(10))
+    def __call__(self, idx, targets=None):
+        B, T = idx.shape
 
-optimizer = SGD(eta=0.05, momentum=0.9, weight_decay=0.0005)
-optimizer.bind_loss_fn(cross_entropy_loss)
-optimizer.bind_network(network)
+        tok_emb = self.token_embedding_table(idx)
+        pos_emb = self.position_embedding_table(mx.arange(T))
+        x = tok_emb + pos_emb
 
-train(train_data, epochs=100, batch_size=128, test_data=test_data)
+        for block in self.blocks:
+            x = block(x)
+
+        x = self.ln_f(x)
+        logits = self.lm_head(x)
+
+        if targets is None:
+            return logits, None
+
+        B, T, C = logits.shape
+        logits_flat = logits.reshape(B * T, C)
+        targets_flat = targets.reshape(B * T)
+        loss = nn.losses.cross_entropy(logits_flat, targets_flat, reduction='mean')
+
+        return logits, loss
+
+    def generate(self, idx, max_new_tokens):
+        for _ in range(max_new_tokens):
+            idx_cond = idx[:, -block_size:]
+            logits, _ = self(idx_cond)
+            logits = logits[:, -1, :]
+            probs = mx.softmax(logits, axis=-1)
+
+            # Sample from the distribution
+            idx_next = mx.random.categorical(mx.log(probs), num_samples=1)
+            idx = mx.concatenate([idx, idx_next], axis=1)
+
+        return idx
+
+
+def loss_fn(model, x, y):
+    """Compute loss for a batch"""
+    _, loss = model(x, y)
+    return loss
+
+
+def estimate_loss(model):
+    """Estimate loss on train and val sets"""
+    out = {}
+    for split in ['train', 'val']:
+        losses = []
+        for k in range(eval_iters):
+            X, Y = get_batch(split)
+            _, loss = model(X, Y)
+            losses.append(loss.item())
+        out[split] = np.mean(losses)
+    return out
+
+
+# Initialize model and optimizer
+model = BigramLanguageModel()
+# optimizer = optim.AdamW(learning_rate=learning_rate)
+optimizer = optim.SGD(learning_rate=learning_rate, momentum=0.9, weight_decay=1e-4)
+
+# Get loss and gradient function
+loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
+
+# Training loop
+for iter in range(max_iters):
+    if iter % eval_interval == 0:
+        losses = estimate_loss(model)
+        print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+
+    print(f"{datetime.now()} - Batch {iter}")
+
+    # Sample batch
+    xb, yb = get_batch('train')
+
+    # Compute loss and gradients
+    loss, grads = loss_and_grad_fn(model, xb, yb)
+
+    # Update parameters
+    optimizer.update(model, grads)
+    mx.eval(model.parameters())
+
+# Final evaluation
+losses = estimate_loss(model)
+print(f"Final: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
+
+# Generate from the model
+context = mx.zeros((1, 1), dtype=mx.int32)
+generated = model.generate(context, max_new_tokens=500)
+print(decode(generated[0].tolist()))
