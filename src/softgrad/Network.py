@@ -37,12 +37,14 @@ class Network():
         for layer in self.layers:
             layer.unfreeze()
 
+    # todo: this doesn't work for RecursiveLayers (Sequential, Parallel, etc.)
     def save(self):
         raw_params = []
         for layer in self.layers:
             raw_params.append(layer.params)
         return Checkpoint(raw_params)
 
+    # todo: this doesn't work for RecursiveLayers (Sequential, Parallel, etc.)
     def load(self, checkpoint):
         for layer, params in zip(self.layers, checkpoint.params):
             layer.params = params
