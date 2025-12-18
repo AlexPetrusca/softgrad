@@ -7,7 +7,9 @@ class TrainableLayer(Layer):
         self.trainable = True
 
     def get_trainable_layers(self):
-        return [self]
+        if self.trainable:
+            return [self]
+        return []
 
     def freeze(self):
         self.trainable = False

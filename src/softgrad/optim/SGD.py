@@ -23,16 +23,19 @@ class SGD(Optimizer):
         for layer in self.network.layers:
             trainable_layers.extend(layer.get_trainable_layers())
         for i, layer in enumerate(trainable_layers):
-            if layer.trainable:
-                batch_size = layer.ctx.dx_out.shape[0]
-                eta = self.eta / batch_size
-                for param in layer.params:
-                    v_key = f"v{param.name}_{i}"
-                    self.ctx[v_key] = self.momentum * self.ctx.get(v_key, 0) - self.weight_decay * eta * param.value - eta * param.grad
-                    param.value = param.value + self.ctx[v_key]
+            batch_size = layer.ctx.dx_out.shape[0]
+            eta = self.eta / batch_size
+            for param in layer.params:
+                v_key = f"v{param.name}_{i}"
+                self.ctx[v_key] = self.momentum * self.ctx.get(v_key, 0) - self.weight_decay * eta * param.value - eta * param.grad
+                param.value = param.value + self.ctx[v_key]
             layer.params.zero_grad()
 
-        # Eval all momentum buffers to clean compuation graphs ; avoid memory leak
+        # zero gradients
+        for layer in self.network.layers:
+            layer.params.zero_grad()
+
+        # Eval all momentum buffers to clean computation graphs ; avoid memory leak
         mx.eval([v for v in self.ctx.values() if isinstance(v, mx.array)])
 
         return grad # gradient for the input

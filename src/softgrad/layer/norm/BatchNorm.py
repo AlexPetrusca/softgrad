@@ -14,7 +14,6 @@ class BatchNorm(TrainableLayer):
         super().__init__()
         self.momentum = momentum
         self.eps = eps
-        self.training = True
 
     def _link(self):
         # Determine number of features (last dimension)
@@ -45,7 +44,7 @@ class BatchNorm(TrainableLayer):
         Input: (batch, ..., features)
         Output: (batch, ..., features)
         """
-        if self.training:
+        if self.trainable:
             # Compute statistics over batch (and spatial) dimensions
             if len(self.input_shape) == 1:
                 # 1D: normalize over batch
@@ -118,11 +117,3 @@ class BatchNorm(TrainableLayer):
         dx = (1.0 / N) / std * (N * dy_scaled - sum_dy - x_norm * sum_dy_xnorm)
 
         return dx
-
-    def train(self):
-        """Enable training mode."""
-        self.training = True
-
-    def eval(self):
-        """Enable evaluation mode."""
-        self.training = False

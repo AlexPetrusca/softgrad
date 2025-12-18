@@ -9,7 +9,6 @@ class Layer(ABC):
         self.params: Layer.Parameters = Layer.Parameters()
         self.input_shape: Optional[tuple] = None
         self.output_shape: Optional[tuple] = None
-        self.trainable: bool = False
 
     def link(self, input_shape: tuple | int) -> None:
         if isinstance(input_shape, int):
