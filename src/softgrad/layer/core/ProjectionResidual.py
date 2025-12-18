@@ -14,7 +14,7 @@ class ProjectionResidual(RecursiveLayer):
         super().__init__()
         self.main_path = main_path
         self.projection = None
-        self.children = [self.main_path]
+        self.layers = [self.main_path]
 
     def _link(self):
         # Link main path
@@ -31,7 +31,7 @@ class ProjectionResidual(RecursiveLayer):
                 BatchNorm()
             ])
             self.projection.link(self.input_shape)
-            self.children.append(self.projection)
+            self.layers.append(self.projection)
 
             # Verify shapes match after projection
             if self.projection.output_shape != self.main_path.output_shape:

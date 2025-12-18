@@ -37,6 +37,12 @@ class Network():
         for layer in self.layers:
             layer.unfreeze()
 
+    def eval(self):
+        self.freeze()
+
+    def train(self):
+        self.unfreeze()
+
     # todo: this doesn't work for RecursiveLayers (Sequential, Parallel, etc.)
     def save(self):
         raw_params = []

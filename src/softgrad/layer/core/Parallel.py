@@ -7,23 +7,23 @@ from softgrad.function import Function
 class Parallel(RecursiveLayer):
     def __init__(self, layers, aggregation_fn):
         super().__init__()
-        self.children = layers
+        self.layers = layers
         self.aggregation_fn = aggregation_fn
 
     def get_trainable_layers(self):
         """Return all trainable layers from all branches."""
         trainable = []
-        for layer in self.children:
+        for layer in self.layers:
             trainable.extend(layer.get_trainable_layers())
         return trainable
 
     def _link(self):
         # Link all sublayers with the same input shape
-        for layer in self.children:
+        for layer in self.layers:
             layer.link(self.input_shape)
 
         # Verify all outputs have the same shape (required for aggregation)
-        output_shapes = [layer.output_shape for layer in self.children]
+        output_shapes = [layer.output_shape for layer in self.layers]
         if not all(shape == output_shapes[0] for shape in output_shapes):
             raise ValueError(
                 f"All parallel layers must have the same output shape for aggregation. "
@@ -39,7 +39,7 @@ class Parallel(RecursiveLayer):
 
     def _forward(self, x_in: mx.array) -> mx.array:
         # Execute all layers in parallel
-        outputs = [layer.forward(x_in) for layer in self.children]
+        outputs = [layer.forward(x_in) for layer in self.layers]
 
         # Aggregate results
         result = self.aggregation_fn.apply(*outputs)
@@ -58,7 +58,7 @@ class Parallel(RecursiveLayer):
 
         # Backprop through each layer
         dx_ins = []
-        for i, layer in enumerate(self.children):
+        for i, layer in enumerate(self.layers):
             dx_in = layer.backward(d_outputs[i])
             dx_ins.append(dx_in)
 

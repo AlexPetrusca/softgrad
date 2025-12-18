@@ -1,7 +1,7 @@
 import mlx.core as mx
 from softgrad import Network
 from softgrad.function.loss import MSELoss
-from softgrad.layer.core import Embedding, Linear
+from softgrad.layer.core import NaiveEmbedding, Linear
 from softgrad.layer.norm import LayerNorm
 from softgrad.layer.transform import Flatten
 from softgrad.optim import SGD
