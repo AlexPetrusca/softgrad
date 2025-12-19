@@ -10,7 +10,7 @@ from tqdm import tqdm # pip install tqdm
 # ------------------------------------------
 local_dir = "rsc/bookcorpus"
 remote_name = "sample-100M"
-shard_size = int(1e8) # 100M tokens per shard, total of 100 shards
+shard_size = int(1e8)
 
 # create the cache the local directory if it doesn't exist yet
 DATA_CACHE_DIR = os.path.join(os.path.dirname(__file__), local_dir)

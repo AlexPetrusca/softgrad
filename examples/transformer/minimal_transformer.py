@@ -1,9 +1,6 @@
-import datetime
 import math
-import time
 
 import mlx.core as mx
-import matplotlib.pyplot as plt
 import numpy as np
 from mlx import nn
 
@@ -101,22 +98,22 @@ class TransformerBlock(Sequential):
 
 mx.random.seed(1337)
 
-# ============================================================================
-# HYPERPARAMETERS
-# ============================================================================
+# ----------------------------------------------------------------------------------
+# Hyperparameters
+# ----------------------------------------------------------------------------------
 batch_size = 32
 block_size = 128
-max_iters = 25000        # Increased - transformers need more steps
-eval_interval = 100     # Less frequent eval
-learning_rate = 3e-2    # Lower LR for transformer (more stable)
+max_iters = 25000
+eval_interval = 100
+learning_rate = 3e-2
 eval_iters = 50
-n_embd = 128
-n_head = 4              # 4 heads of size 32 each
-n_layer = 2             # 2 transformer blocks (minimal but effective)
+n_embd = 128            # each token -> 128
+n_head = 4              # 4 heads -> 32
+n_layer = 2             # 2 transformer blocks
 
-# ============================================================================
-# DATA LOADING
-# ============================================================================
+# ----------------------------------------------------------------------------------
+# Load Dataset
+# ----------------------------------------------------------------------------------
 with open('rsc/tinyshakespeare.txt', 'r', encoding='utf-8') as f:
     text = f.read()
 
@@ -142,82 +139,50 @@ def get_batch(split):
 
 
 def generate_text(network, start_text="", max_new_tokens=500, temperature=1.0, top_k=None):
-    """
-    Generate text from the model.
-
-    Args:
-        network: Your trained Network
-        start_text: Starting prompt (empty string for unconditional generation)
-        max_new_tokens: Number of tokens to generate
-        temperature: Sampling temperature (higher = more random)
-        top_k: If set, only sample from top k most likely tokens
-    """
-    # Encode the starting text
     if start_text:
         context = encode(start_text)
     else:
-        context = [0]  # Start with a single token (could be any token)
+        context = [0]
 
-    context = list(context)  # Make it mutable
+    context = list(context)
 
     for _ in range(max_new_tokens):
-        # Take the last block_size tokens (or pad if shorter)
         if len(context) < block_size:
-            # Pad with zeros on the left
-            context_padded = [0] * (block_size - len(context)) + context
+            context_padded = [0] * (block_size - len(context)) + context  # pad 0s on the left
         else:
-            # Take last block_size tokens
-            context_padded = context[-block_size:]
+            context_padded = context[-block_size:]  # take as much as we can fit into context
 
-        # Convert to array with batch dimension
         context_array = mx.array(context_padded)[None, :]  # (1, block_size)
-
-        # Get predictions
         logits = network.forward(context_array, save_ctx=False)  # (1, block_size, vocab_size)
 
-        # Focus on the last time step (the position we're predicting)
-        # If we padded, we want the position corresponding to our actual sequence length
         if len(context) < block_size:
-            # Prediction is at position len(context) - 1 (due to padding)
             logits = logits[:, len(context) - 1, :]  # (1, vocab_size)
         else:
-            # Prediction is at the last position
             logits = logits[:, -1, :]  # (1, vocab_size)
 
-        # Apply temperature
         logits = logits / temperature
 
-        # Optionally crop to top k tokens
         if top_k is not None:
-            # Get top k values and indices
             top_values = mx.sort(logits[0])[-top_k:]
             threshold = top_values[0]
-
-            # Mask out tokens below threshold
             logits_filtered = mx.where(logits[0] >= threshold, logits[0], float('-inf'))
-            logits = logits_filtered[None, :]  # Add batch dim back
+            logits = logits_filtered[None, :]
 
-        # Convert to probabilities
-        probs = mx.softmax(logits, axis=-1)  # (1, vocab_size)
-
-        # Sample from the distribution
-        idx_next = mx.random.categorical(mx.log(probs[0]), num_samples=1)  # (1,)
-
-        # Append to sequence
+        probs = mx.softmax(logits, axis=-1) # convert to probabilities
+        idx_next = mx.random.categorical(mx.log(probs[0]), num_samples=1) # sample from distribution
         context.append(int(idx_next[0]))
 
-    # Decode only the generated tokens (skip the initial context)
     if start_text:
         generated_tokens = context[len(encode(start_text)):]
     else:
-        generated_tokens = context[1:]  # Skip the initial [0]
+        generated_tokens = context[1:]
 
     return decode(generated_tokens)
 
 
-# ============================================================================
-# SETUP NETWORK AND OPTIMIZER
-# ============================================================================
+# ----------------------------------------------------------------------------------
+# Setup Network
+# ----------------------------------------------------------------------------------
 print("Setting up network...")
 network = Network(input_shape=(block_size,))
 network.add_layer(Parallel([
@@ -239,21 +204,20 @@ optimizer.bind_loss_fn(sequence_ce_loss)
 optimizer.bind_network(network)
 
 
-# ============================================================================
-# EVALUATION FUNCTION
-# ============================================================================
+# ----------------------------------------------------------------------------------
+# Evaluation function
+# ----------------------------------------------------------------------------------
 def estimate_loss():
-    """Estimate loss on train and val sets"""
     out = {}
     for split in ['train', 'val']:
         losses = []
         for k in range(eval_iters):
             X, Y = get_batch(split)
 
-            # Forward pass
+            # forward pass
             logits = network.forward(X, save_ctx=False)
 
-            # Compute loss
+            # compute loss
             loss_per_token = sequence_ce_loss.apply(logits, Y)
             mean_loss = mx.mean(loss_per_token)
 
@@ -264,51 +228,30 @@ def estimate_loss():
     return out
 
 
-# ============================================================================
-# TRAINING LOOP
-# ============================================================================
-print("\nTraining SimpleBigramModel with your framework...")
-print("=" * 60)
+# ----------------------------------------------------------------------------------
+# Train Loop
+# ----------------------------------------------------------------------------------
+print("-" * 50)
+print("\nTraining...")
+print("-" * 50)
 
 for iter in range(max_iters):
-    # Evaluate periodically
     if iter % eval_interval == 0:
         losses = estimate_loss()
         print(f"step {iter:4d}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-    # Get batch
     xb, yb = get_batch('train')
-
-    # Optimization step (forward + backward + update)
     optimizer.step(xb, yb)
 
-# ============================================================================
+# ----------------------------------------------------------------------------------
 # FINAL EVALUATION
-# ============================================================================
-print("\n" + "=" * 60)
-print("FINAL RESULTS")
-print("=" * 60)
+# ----------------------------------------------------------------------------------
 losses = estimate_loss()
 print(f"Final: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-# ============================================================================
-# GENERATION TESTS (add after training)
-# ============================================================================
-
-print("\n" + "=" * 80)
-print("TEXT GENERATION")
-print("=" * 80)
-
-# 1. Unconditional generation (from scratch)
-print("\n1. UNCONDITIONAL GENERATION (random start)")
-print("-" * 80)
-text = generate_text(network, start_text="", max_new_tokens=300, temperature=1.0)
-print(text)
-
-# 2. Conditional generation with prompts
-print("\n2. CONDITIONAL GENERATION (with prompts)")
-print("-" * 80)
-
+# ----------------------------------------------------------------------------------
+# Generate
+# ----------------------------------------------------------------------------------
 prompts = [
     "ROMEO:",
     "To be or not to be",
@@ -323,8 +266,8 @@ for prompt in prompts:
         network,
         start_text=prompt,
         max_new_tokens=150,
-        temperature=0.8,  # Slightly conservative
-        top_k=40  # Only sample from top 40 tokens
+        temperature=0.8,
+        top_k=40
     )
     print(prompt + generated)
     print()

@@ -9,9 +9,9 @@ import numpy as np
 
 mx.random.seed(1337)
 
-# ============================================================================
-# HYPERPARAMETERS - MINIMAL CONFIG FOR FAST TESTING
-# ============================================================================
+# ----------------------------------------------------------------------------------
+# Hyperparameters - MINIMAL CONFIG FOR FAST TESTING
+# ----------------------------------------------------------------------------------
 batch_size = 32        # Reduced from 64
 block_size = 128       # Reduced from 256 - still enough context
 max_iters = 1000       # Reduced from 5000 - enough to see convergence
@@ -198,7 +198,7 @@ optimizer = optim.SGD(learning_rate=learning_rate, momentum=0.9, weight_decay=1e
 # Get loss and gradient function
 loss_and_grad_fn = nn.value_and_grad(model, loss_fn)
 
-# Training loop
+# Train Network
 for iter in range(max_iters):
     if iter % eval_interval == 0:
         losses = estimate_loss(model)
