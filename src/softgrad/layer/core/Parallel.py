@@ -3,7 +3,6 @@ from softgrad.layer import RecursiveLayer
 from softgrad.function import Function
 
 
-# todo: test
 class Parallel(RecursiveLayer):
     def __init__(self, layers, aggregation_fn):
         super().__init__()

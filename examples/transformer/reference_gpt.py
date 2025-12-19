@@ -9,17 +9,18 @@ import numpy as np
 
 mx.random.seed(1337)
 
-# hyperparameters
-batch_size = 64
-block_size = 256
-max_iters = 5000
-eval_interval = 100
-learning_rate = 3e-4
-eval_iters = 200
-n_embd = 768
-n_head = 6
-n_transformer_blocks = 6
-dropout = 0.2
+# ============================================================================
+# HYPERPARAMETERS - MINIMAL CONFIG FOR FAST TESTING
+# ============================================================================
+batch_size = 32        # Reduced from 64
+block_size = 128       # Reduced from 256 - still enough context
+max_iters = 1000       # Reduced from 5000 - enough to see convergence
+eval_interval = 50     # Evaluate more frequently
+learning_rate = 1e-2   # Higher LR for MLX shim (see explanation below)
+eval_iters = 50        # Reduced from 200 - faster eval
+n_embd = 128           # Reduced from 384 - smaller model
+n_head = 4             # Reduced from 6
+n_block = 2            # Reduced from 6 - 2 layers is enough to learn
 
 # Load and prepare data
 with open('rsc/tinyshakespeare.txt', 'r', encoding='utf-8') as f:
@@ -56,7 +57,6 @@ class Head(nn.Module):
         self.key = nn.Linear(n_embd, head_size, bias=False)
         self.query = nn.Linear(n_embd, head_size, bias=False)
         self.value = nn.Linear(n_embd, head_size, bias=False)
-        self.dropout = nn.Dropout(dropout)
 
     def __call__(self, x):
         B, T, C = x.shape
@@ -71,7 +71,6 @@ class Head(nn.Module):
         wei_logits = mx.where(mask[:T, :T] == 0, float('-inf'), wei_logits)
 
         wei = mx.softmax(wei_logits, axis=-1)
-        wei = self.dropout(wei)
 
         v = self.value(x)
         out = wei @ v
@@ -85,12 +84,10 @@ class MultiHeadAttention(nn.Module):
         super().__init__()
         self.heads = [Head(head_size) for _ in range(num_heads)]
         self.proj = nn.Linear(n_embd, n_embd)
-        self.dropout = nn.Dropout(dropout)
 
     def __call__(self, x):
         out = mx.concatenate([h(x) for h in self.heads], axis=-1)
         out = self.proj(out)
-        out = self.dropout(out)
         return out
 
 
@@ -101,13 +98,11 @@ class FeedForward(nn.Module):
         super().__init__()
         self.linear1 = nn.Linear(n_embd, 4 * n_embd)
         self.linear2 = nn.Linear(4 * n_embd, n_embd)
-        self.dropout = nn.Dropout(dropout)
 
     def __call__(self, x):
         x = self.linear1(x)
         x = nn.relu(x)
         x = self.linear2(x)
-        x = self.dropout(x)
         return x
 
 
@@ -135,7 +130,7 @@ class BigramLanguageModel(nn.Module):
         super().__init__()
         self.token_embedding_table = nn.Embedding(vocab_size, n_embd)
         self.position_embedding_table = nn.Embedding(block_size, n_embd)
-        self.blocks = [TransformerBlock(n_embd, n_head) for _ in range(n_transformer_blocks)]
+        self.blocks = [TransformerBlock(n_embd, n_head) for _ in range(n_block)]
         self.ln_f = nn.LayerNorm(n_embd)
         self.lm_head = nn.Linear(n_embd, vocab_size)
 
@@ -209,7 +204,7 @@ for iter in range(max_iters):
         losses = estimate_loss(model)
         print(f"step {iter}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-    print(f"{datetime.now()} - Batch {iter}")
+    # print(f"{datetime.now()} - Batch {iter}")
 
     # Sample batch
     xb, yb = get_batch('train')
