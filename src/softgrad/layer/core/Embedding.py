@@ -29,15 +29,10 @@ class Embedding(TrainableLayer):
         # Use bincount-style accumulation for efficiency
         # Create one-hot encoding for each index
         for idx in range(self.num_embeddings):
-            # Find all positions where this index appears
             mask = (indices_flat == idx).astype(mx.float32)
-
             if mx.sum(mask) > 0:
                 # Sum gradients for all occurrences of this index
-                grad_for_idx = mx.sum(
-                    dx_out_flat * mask[:, mx.newaxis],
-                    axis=0
-                )
+                grad_for_idx = mx.sum(dx_out_flat * mask[:, mx.newaxis], axis=0)
                 self.params["dembeddings"][idx] += grad_for_idx
 
         return mx.zeros(indices.shape, dtype=mx.float32)   # no gradient
