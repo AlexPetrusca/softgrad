@@ -88,8 +88,8 @@ class TransformerBlock(Sequential):
             # communication
             Residual(Sequential([
                 LayerNorm(),
-                MultiHeadAttention(n_head, n_embd // n_head)
-                # MLX(MLXCausalSelfAttention())
+                # MultiHeadAttention(n_head, n_embd // n_head)
+                MLX(MLXCausalSelfAttention())
             ])),
             # computation
             Residual(Sequential([
@@ -104,15 +104,15 @@ mx.random.seed(1337)
 # ============================================================================
 # HYPERPARAMETERS
 # ============================================================================
-batch_size = 32
-block_size = 128
-max_iters = 2000        # Increased - transformers need more steps
+batch_size = 64
+block_size = 256
+max_iters = 5000        # Increased - transformers need more steps
 eval_interval = 100     # Less frequent eval
-learning_rate = 3e-3    # Lower LR for transformer (more stable)
-eval_iters = 50
-n_embd = 128
-n_head = 4              # 4 heads of size 32 each
-n_layer = 2             # 2 transformer blocks (minimal but effective)
+learning_rate = 3e-4    # Lower LR for transformer (more stable)
+eval_iters = 200
+n_embd = 768
+n_head = 6              # 4 heads of size 32 each
+n_layer = 6             # 2 transformer blocks (minimal but effective)
 
 # ============================================================================
 # DATA LOADING
@@ -215,6 +215,24 @@ def generate_text(network, start_text="", max_new_tokens=500, temperature=1.0, t
     return decode(generated_tokens)
 
 
+def generate_with_prompt(network, prompt, num_samples=3, max_new_tokens=200, temperature=0.8):
+    """Generate multiple samples from a prompt"""
+    print(f"\nPrompt: '{prompt}'")
+    print("=" * 80)
+
+    for i in range(num_samples):
+        print(f"\n--- Sample {i + 1} ---")
+        generated = generate_text(
+            network,
+            start_text=prompt,
+            max_new_tokens=max_new_tokens,
+            temperature=temperature,
+            top_k=None  # Can set to 40 for more focused sampling
+        )
+        print(prompt + generated)
+        print()
+
+
 # ============================================================================
 # SETUP NETWORK AND OPTIMIZER
 # ============================================================================
@@ -267,7 +285,7 @@ def estimate_loss():
 # ============================================================================
 # TRAINING LOOP
 # ============================================================================
-print("\nTraining SimpleBigramModel with your framework...")
+print("Training...")
 print("=" * 60)
 
 for iter in range(max_iters):
@@ -276,7 +294,11 @@ for iter in range(max_iters):
         losses = estimate_loss()
         print(f"step {iter:4d}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
+        if iter % (eval_interval * 5):
+            generate_with_prompt(network, "First Citizen:\n", 2)
+
     # Get batch
+    print(".", end="")
     xb, yb = get_batch('train')
 
     # Optimization step (forward + backward + update)
