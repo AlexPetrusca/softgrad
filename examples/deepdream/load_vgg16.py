@@ -7,7 +7,6 @@ from softgrad.function.activation import relu
 
 
 def build_vgg16_network():
-    """Build VGG16 architecture in your framework"""
     network = Network(input_shape=(224, 224, 3))
 
     # Block 1

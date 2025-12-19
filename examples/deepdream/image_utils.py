@@ -35,8 +35,6 @@ def write_image_mlx(img_path, img_tensor):
     std = IMAGENET_STD.tolist()
     img = (img * std) + mean
 
-    # Convert to uint8
-    img = (np.clip(img, 0., 1.) * 255).astype(np.uint8)
-
     # RGB to BGR
+    img = (np.clip(img, 0., 1.) * 255).astype(np.uint8)
     cv.imwrite(img_path, img[:, :, ::-1])

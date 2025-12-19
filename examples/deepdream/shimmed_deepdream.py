@@ -159,105 +159,78 @@ class VGG16(nn.Module):
         return self(img_tensor, return_layers=layer_names)
 
     def compute_loss_and_gradients(self, img_tensor, layer_names):
-        # Define loss function
         def loss_fn(img):
             activations = self(img, return_layers=layer_names)
             loss = sum(mx.mean(act) for act in activations.values())
             return loss
 
-        # Compute loss and gradients
         loss_and_grad_fn = mx.value_and_grad(loss_fn)
         loss, grads = loss_and_grad_fn(img_tensor)
-
         return loss, grads
 
 
-def deep_dream_simple(
-        img_path,
-        output_path,
-        layer_names=None,
-        n_iterations=20,
-        learning_rate=0.3,
-        target_size=500
-):
+def deep_dream_simple(img_path, output_path, layer_names=None, n_iterations=20, learning_rate=0.3, target_size=500):
     if layer_names is None:
         layer_names = ['conv4_3']
 
-    print(f"Starting DeepDream (simple)...")
-    print(f"Layers: {layer_names}")
-    print(f"Iterations: {n_iterations}")
-    print(f"Learning rate: {learning_rate}")
+    print()
+    print("------------------------------------")
+    print(f"DeepDream simple")
+    print(layer_names)
+    print("------------------------------------")
 
-    # Load image
     img_tensor = read_image_mlx(img_path, target_shape=target_size)
-    print(f"Image shape: {img_tensor.shape}")
-
-    # Load model
     dream = VGG16()
 
-    # Gradient ascent loop
     for iter in range(n_iterations):
-        # Compute loss and gradients
         loss, grads = dream.compute_loss_and_gradients(img_tensor, layer_names)
 
-        # Normalize gradients (smooth them)
+        # normalize gradients
         grad_std = mx.std(grads)
         smooth_grads = grads / (grad_std + 1e-8)
 
-        # Gradient ASCENT (maximize activations)
+        # update image
         img_tensor = img_tensor + learning_rate * smooth_grads
 
         if iter % 10 == 0 or iter == n_iterations - 1:
             print(f"Iteration {iter:3d}, loss: {loss.item():.4f}")
 
-    # Save result
     write_image_mlx(output_path, img_tensor)
 
 
-def deep_dream_with_jitter(
-        img_path,
-        output_path,
-        layer_names=None,
-        n_iterations=20,
-        learning_rate=0.3,
-        jitter=32,
-        target_size=500
-):
+def deep_dream_with_jitter(img_path, output_path, layer_names=None, n_iterations=20, learning_rate=0.3, jitter=32, target_size=500):
     if layer_names is None:
         layer_names = ['conv4_3']
 
-    print(f"Starting DeepDream (with jitter)...")
-    print(f"Layers: {layer_names}")
-    print(f"Jitter: {jitter}px")
+    print()
+    print("------------------------------------")
+    print(f"DeepDream with jitter")
+    print(layer_names)
+    print("------------------------------------")
 
     img_tensor = read_image_mlx(img_path, target_shape=target_size)
     dream = VGG16()
 
     def random_shift(tensor, h_shift, w_shift):
-        """Circularly shift the image"""
-        # Use positional arguments, not keyword arguments
-        tensor = mx.roll(tensor, h_shift, 1)  # Roll along height axis
-        tensor = mx.roll(tensor, w_shift, 2)  # Roll along width axis
+        tensor = mx.roll(tensor, h_shift, 1)
+        tensor = mx.roll(tensor, w_shift, 2)
         return tensor
 
     for iter in range(n_iterations):
-        # Random jitter
         h_shift = np.random.randint(-jitter, jitter + 1)
         w_shift = np.random.randint(-jitter, jitter + 1)
 
-        # Shift image
+        # shift image
         img_shifted = random_shift(img_tensor, h_shift, w_shift)
 
-        # Compute gradients
+        # compute gradient
         loss, grads = dream.compute_loss_and_gradients(img_shifted, layer_names)
-
-        # Normalize gradients
         smooth_grads = grads / (mx.std(grads) + 1e-8)
 
-        # Update shifted image
+        # update image
         img_shifted = img_shifted + learning_rate * smooth_grads
 
-        # Shift back
+        # shift image back
         img_tensor = random_shift(img_shifted, -h_shift, -w_shift)
 
         if iter % 10 == 0 or iter == n_iterations - 1:
@@ -266,29 +239,16 @@ def deep_dream_with_jitter(
     write_image_mlx(output_path, img_tensor)
 
 
-def deep_dream_octaves(
-        img_path,
-        output_path,
-        layer_names=None,
-        octaves=4,
-        octave_scale=1.4,
-        n_iterations=10,
-        learning_rate=0.1,
-        jitter=32,
-        target_size=800
-):
-    """
-    DeepDream with octave pyramid for multi-scale patterns
-
-    Args:
-        octaves: Number of scales
-        octave_scale: Scale factor between octaves
-    """
+def deep_dream_octaves(img_path, output_path, layer_names=None, octaves=4, octave_scale=1.4, n_iterations=10,
+                       learning_rate=0.1, jitter=32, target_size=800):
     if layer_names is None:
         layer_names = ['conv4_3']
 
-    print(f"Starting DeepDream (octaves)...")
-    print(f"Octaves: {octaves}, scale: {octave_scale}")
+    print()
+    print("------------------------------------")
+    print(f"DeepDream with jitter + octaves")
+    print(layer_names)
+    print("------------------------------------")
 
     img_tensor = read_image_mlx(img_path, target_shape=target_size)
     base_shape = img_tensor.shape[1:3]  # (H, W)
@@ -296,15 +256,11 @@ def deep_dream_octaves(
     dream = VGG16()
 
     def random_shift(tensor, h_shift, w_shift):
-        """Circularly shift the image"""
-        # Use positional arguments, not keyword arguments
-        tensor = mx.roll(tensor, h_shift, 1)  # Roll along height axis
-        tensor = mx.roll(tensor, w_shift, 2)  # Roll along width axis
+        tensor = mx.roll(tensor, h_shift, 1)
+        tensor = mx.roll(tensor, w_shift, 2)
         return tensor
 
     def resize_image(img, new_shape):
-        """Resize using simple interpolation"""
-        # For simplicity, use numpy resize
         img_np = np.array(img[0])
         from scipy.ndimage import zoom
 
@@ -314,43 +270,38 @@ def deep_dream_octaves(
         resized = zoom(img_np, (h_scale, w_scale, 1), order=1)
         return mx.array(resized)[None, ...]
 
-    # Process each octave (small to large)
     for octave in range(octaves):
-        # Calculate new shape for this octave
         exponent = octave - octaves + 1
         new_h = int(base_shape[0] * (octave_scale ** exponent))
         new_w = int(base_shape[1] * (octave_scale ** exponent))
         new_shape = (new_h, new_w)
 
-        print(f"\nOctave {octave + 1}/{octaves}: {new_shape}")
+        print(f"Octave {octave + 1}/{octaves}: {new_shape}")
 
-        # Resize image to this octave
         img_tensor = resize_image(img_tensor, new_shape)
 
-        # DeepDream iterations for this octave
         for iter in range(n_iterations):
-            # Random jitter
             h_shift = np.random.randint(-jitter, jitter + 1)
             w_shift = np.random.randint(-jitter, jitter + 1)
 
+            # shift image
             img_shifted = random_shift(img_tensor, h_shift, w_shift)
 
-            # Compute gradients
+            # compute gradients
             loss, grads = dream.compute_loss_and_gradients(img_shifted, layer_names)
             smooth_grads = grads / (mx.std(grads) + 1e-8)
 
-            # Gradient ascent
+            # update image
             img_shifted = img_shifted + learning_rate * smooth_grads
+            img_shifted = mx.clip(img_shifted, -3.0, 3.0)  # clamp
 
-            # Clamp to valid range
-            # Approximate bounds (ImageNet normalized)
-            img_shifted = mx.clip(img_shifted, -3.0, 3.0)
-
-            # Shift back
+            # shift image back
             img_tensor = random_shift(img_shifted, -h_shift, -w_shift)
 
             if iter % 5 == 0:
-                print(f"  Iter {iter:2d}, loss: {loss.item():.4f}")
+                print(f"- Iter {iter:2d}, loss: {loss.item():.4f}")
+
+        print()
 
     write_image_mlx(output_path, img_tensor)
 
