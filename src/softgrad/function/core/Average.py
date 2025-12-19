@@ -12,3 +12,6 @@ class Average(Function):
     def derivative(dx_out, *inputs):
         # Gradient of average: divided equally among inputs
         return [dx_out / len(inputs) for _ in inputs]
+
+
+average = Average()

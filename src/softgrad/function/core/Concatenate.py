@@ -16,3 +16,6 @@ class Concatenate(Function):
             gradients.append(dx_out[..., start:start + size])
             start += size
         return gradients
+
+
+concatenate = Concatenate()

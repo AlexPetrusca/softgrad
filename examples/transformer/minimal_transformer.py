@@ -16,6 +16,9 @@ from softgrad.layer.transform.PositionIndices import PositionIndices
 from softgrad.optim import SGD
 
 
+# todo: We need to train with padding tokens, since prompt context is usually much smaller than window
+#   - Bug: getting bad generation until the context window is filled up
+
 class MLXCausalSelfAttention(nn.Module):
     def __init__(self):
         super().__init__()
@@ -183,7 +186,6 @@ def generate_text(network, start_text="", max_new_tokens=500, temperature=1.0, t
 # ----------------------------------------------------------------------------------
 # Setup Network
 # ----------------------------------------------------------------------------------
-print("Setting up network...")
 network = Network(input_shape=(block_size,))
 network.add_layer(Parallel([
     Embedding(vocab_size, n_embd),  # Semantic encoding
@@ -198,7 +200,6 @@ network.add_layer(Sequential(
 network.add_layer(LayerNorm())
 network.add_layer(Linear(vocab_size))  # LLM head
 
-print("Setting up optimizer...")
 optimizer = SGD(eta=learning_rate, momentum=0.9, weight_decay=1e-4)
 optimizer.bind_loss_fn(sequence_ce_loss)
 optimizer.bind_network(network)
@@ -231,10 +232,6 @@ def estimate_loss():
 # ----------------------------------------------------------------------------------
 # Train Loop
 # ----------------------------------------------------------------------------------
-print("-" * 50)
-print("\nTraining...")
-print("-" * 50)
-
 for iter in range(max_iters):
     if iter % eval_interval == 0:
         losses = estimate_loss()
@@ -244,14 +241,11 @@ for iter in range(max_iters):
     optimizer.step(xb, yb)
 
 # ----------------------------------------------------------------------------------
-# FINAL EVALUATION
+# Final Evaluation
 # ----------------------------------------------------------------------------------
 losses = estimate_loss()
 print(f"Final: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-# ----------------------------------------------------------------------------------
-# Generate
-# ----------------------------------------------------------------------------------
 prompts = [
     "ROMEO:",
     "To be or not to be",
@@ -271,3 +265,24 @@ for prompt in prompts:
     )
     print(prompt + generated)
     print()
+
+
+# Starting with: 'First Citizen:\n'
+# ICIHAIIITiwhiIhITMIATIISICkOYYhhCFiTTBWiIISAEMJREMSTCipTOsvW::ei:in:ns :yIrhitsIyW:ii:ii idii ie:  tke nt
+# tihwh  zectringielth word I spriselflike grat
+# ThinD his kin hath bendsech nill onswemby.
+# AUT-l
+# --------------------------------------------------------------------------------
+# Starting with: '\n\n'
+# hiiiIIIIEhhhihIBISIASwiIIIIIAIBItiWIhLWLIXWeSiEHITIIYPGOGSEICISTATUCienaTHy:c;j,idwiinaaI:isinnh:y:  :;  hi
+#  :a,  aiss ur mnoase waas hatngess
+# I gath I all, good try ackiffe,
+# So I surd, shald dries
+# T
+# --------------------------------------------------------------------------------
+# Starting with: 'The '
+# hNIA:IhIIIwWTiIiTIAITIIhIYSIIIhIwCNCRETCMSGHI:IIIgJIuApTISCVRIIILiSTIfaIAni:w:hUOciIiIn rI: iOntI:t ,ikhshh w
+# sc  iaiobkne anyI
+# atERncest thy have yenmmoms'Oorok the not that caman
+# Musfienfole it su
+# --------------------------------------------------------------------------------

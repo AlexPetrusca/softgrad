@@ -1,6 +1,5 @@
 # MLX implementation of a GPT-style transformer
 # Converted from PyTorch to MLX for Apple Silicon optimization
-from datetime import datetime
 
 import mlx.core as mx
 import mlx.nn as nn
@@ -10,17 +9,17 @@ import numpy as np
 mx.random.seed(1337)
 
 # ----------------------------------------------------------------------------------
-# Hyperparameters - MINIMAL CONFIG FOR FAST TESTING
+# Hyperparameters
 # ----------------------------------------------------------------------------------
-batch_size = 32        # Reduced from 64
-block_size = 128       # Reduced from 256 - still enough context
-max_iters = 1000       # Reduced from 5000 - enough to see convergence
-eval_interval = 50     # Evaluate more frequently
-learning_rate = 1e-2   # Higher LR for MLX shim (see explanation below)
-eval_iters = 50        # Reduced from 200 - faster eval
-n_embd = 128           # Reduced from 384 - smaller model
-n_head = 4             # Reduced from 6
-n_block = 2            # Reduced from 6 - 2 layers is enough to learn
+batch_size = 32
+block_size = 128
+max_iters = 1000
+eval_interval = 50
+learning_rate = 1e-2
+eval_iters = 50
+n_embd = 128
+n_head = 4
+n_block = 2
 
 # Load and prepare data
 with open('rsc/tinyshakespeare.txt', 'r', encoding='utf-8') as f:

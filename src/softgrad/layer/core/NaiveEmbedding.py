@@ -29,5 +29,4 @@ class NaiveEmbedding(TrainableLayer):
             idx = int(indices_flat[i])
             self.params["dembeddings"][idx] += dx_out_flat[i]
 
-        # No gradient (return zeros for consistency)
-        return mx.zeros(indices.shape, dtype=mx.float32)
+        return mx.zeros(indices.shape, dtype=mx.float32)  # no gradient

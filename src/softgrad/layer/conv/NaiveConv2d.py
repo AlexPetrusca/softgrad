@@ -26,18 +26,11 @@ class NaiveConv2d(TrainableLayer):
         w_out = w_in - kw + 1
         self.output_shape = (h_out, w_out, self.out_channels)
 
-        # Initialize weights and biases
         fan_in = kh * kw * self.in_channels
         scale = math.sqrt(1.0 / fan_in)
 
-        self.params["W"] = mx.random.uniform(
-            -scale, scale,
-            shape=(kh, kw, self.in_channels, self.out_channels)
-        )
-        self.params["b"] = mx.random.uniform(
-            -scale, scale,
-            shape=(self.out_channels,)
-        )
+        self.params["W"] = mx.random.uniform(-scale, scale, shape=(kh, kw, self.in_channels, self.out_channels))
+        self.params["b"] = mx.random.uniform(-scale, scale, shape=(self.out_channels,))
 
     def _forward(self, x_in: mx.array) -> mx.array:
         batch_size = x_in.shape[0]
@@ -46,17 +39,14 @@ class NaiveConv2d(TrainableLayer):
 
         x_out = mx.zeros((batch_size, h_out, w_out, self.out_channels))
 
-        # Reshape weights for matrix multiplication
-        W_reshaped = self.params["W"].reshape(-1, self.out_channels)  # (kh*kw*C_in, C_out)
-
+        # reshape weights for matrix multiplication
+        W_reshaped = self.params["W"].reshape(-1, self.out_channels)  # (kh * kw * C_in, C_out)
         for y in range(h_out):
             for x in range(w_out):
-                # Extract window
                 window = x_in[:, y:y + kh, x:x + kw, :]  # (batch, kh, kw, C_in)
                 window_flat = window.reshape(batch_size, -1)  # (batch, kh*kw*C_in)
 
-                # Convolve: window @ weights + bias
-                x_out[:, y, x, :] = window_flat @ W_reshaped + self.params["b"]
+                x_out[:, y, x, :] = window_flat @ W_reshaped + self.params["b"]  # convolve: window @ weights + bias
 
         return x_out
 
@@ -66,21 +56,20 @@ class NaiveConv2d(TrainableLayer):
         kh, kw = self.kernel_size
 
         dx_in = mx.zeros(self.ctx.x_in.shape)
-        W_reshaped = self.params["W"].reshape(-1, self.out_channels)  # (kh*kw*C_in, C_out)
+        W_reshaped = self.params["W"].reshape(-1, self.out_channels)  # (kh * kw * C_in, C_out)
 
         for y in range(h_out):
             for x in range(w_out):
-                # Extract window from input
                 window = self.ctx.x_in[:, y:y + kh, x:x + kw, :]  # (batch, kh, kw, C_in)
-                window_flat = window.reshape(batch_size, -1)  # (batch, kh*kw*C_in)
+                window_flat = window.reshape(batch_size, -1)  # (batch, kh * kw * C_in)
                 grad = dx_out[:, y, x, :]  # (batch, C_out)
 
-                # Gradient for weights: window^T @ grad
-                dW_flat = window_flat.T @ grad  # (kh*kw*C_in, batch) @ (batch, C_out) = (kh*kw*C_in, C_out)
+                # gradient for weights: window^T @ grad
+                dW_flat = window_flat.T @ grad  # (kh * kw * C_in, batch) @ (batch, C_out) = (kh * kw * C_in, C_out)
                 dW = dW_flat.reshape(kh, kw, c_in, self.out_channels)
                 self.params["dW"] += dW
 
-                # Gradient for bias: sum over batch
+                # gradient for bias: sum over batch
                 self.params["db"] += mx.sum(grad, axis=0)
 
                 # Gradient for input: grad @ weights^T

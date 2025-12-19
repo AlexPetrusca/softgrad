@@ -12,3 +12,6 @@ class Add(Function):
     def derivative(dx_out, *inputs):
         # Gradient of addition: flows equally to all inputs
         return [dx_out for _ in inputs]
+
+
+add = Add()

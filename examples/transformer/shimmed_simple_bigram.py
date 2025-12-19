@@ -1,4 +1,5 @@
-# Test convergence with simplest possible model in your framework
+# Test convergence with simple bigram model
+
 import mlx.core as mx
 import mlx.nn as nn
 import numpy as np
@@ -47,13 +48,11 @@ def get_batch(split):
     y = mx.stack([data_split[int(i) + 1:int(i) + block_size + 1] for i in ix])
     return x, y
 
+# ----------------------------------------------------------------------------------
+# Setup Network
+# ----------------------------------------------------------------------------------
 
-# ----------------------------------------------------------------------------------
-# MODEL - Returns ONLY logits (not loss)
-# ----------------------------------------------------------------------------------
 class SimpleBigramModel(nn.Module):
-    """Simplest possible model - embed and average, then predict"""
-
     def __init__(self):
         super().__init__()
         self.token_embedding = nn.Embedding(vocab_size, n_embd)
@@ -62,49 +61,31 @@ class SimpleBigramModel(nn.Module):
     def __call__(self, idx):
         B, T = idx.shape
 
-        # Embed tokens
+        # get embeddings
         tok_emb = self.token_embedding(idx)  # (B, T, n_embd)
-
-        # Average over time (simplest aggregation)
         x = mx.mean(tok_emb, axis=1)  # (B, n_embd)
 
-        # Predict logits
+        # pass through mlp
         logits = self.lm_head(x)  # (B, vocab_size)
+        logits = mx.broadcast_to(logits[:, None, :], (B, T, vocab_size))  # (B, T, vocab_size)
 
-        # Broadcast to all positions
-        logits = mx.broadcast_to(logits[:, None, :], (B, T, vocab_size))
+        return logits
 
-        return logits  # Only return logits!
-
-
-# ----------------------------------------------------------------------------------
-# Setup Network
-# ----------------------------------------------------------------------------------
-print("Setting up network...")
 network = Network(input_shape=(block_size,))
 network.add_layer(MLX(SimpleBigramModel(), dtype=mx.int32))
 
-print("Setting up optimizer...")
 optimizer = SGD(eta=learning_rate, momentum=0.9, weight_decay=1e-4)
 optimizer.bind_loss_fn(sequence_ce_loss)
 optimizer.bind_network(network)
 
-
-# ----------------------------------------------------------------------------------
-# EVALUATION FUNCTION
-# ----------------------------------------------------------------------------------
 def estimate_loss():
-    """Estimate loss on train and val sets"""
     out = {}
     for split in ['train', 'val']:
         losses = []
         for k in range(eval_iters):
             X, Y = get_batch(split)
 
-            # Forward pass
             logits = network.forward(X, save_ctx=False)
-
-            # Compute loss
             loss_per_token = sequence_ce_loss.apply(logits, Y)
             mean_loss = mx.mean(loss_per_token)
 
@@ -118,70 +99,60 @@ def estimate_loss():
 # ----------------------------------------------------------------------------------
 # Train Network
 # ----------------------------------------------------------------------------------
-print("\nTraining SimpleBigramModel with your framework...")
-print("-" * 50)
-
 for iter in range(max_iters):
-    # Evaluate periodically
     if iter % eval_interval == 0:
         losses = estimate_loss()
         print(f"step {iter:4d}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-    # Get batch
     xb, yb = get_batch('train')
-
-    # Optimization step (forward + backward + update)
     optimizer.step(xb, yb)
 
 # ----------------------------------------------------------------------------------
-# FINAL EVALUATION
+# Final Evaluation
 # ----------------------------------------------------------------------------------
-print("\n" + "=" * 60)
-print("FINAL RESULTS")
-print("-" * 50)
 losses = estimate_loss()
 print(f"Final: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-# ----------------------------------------------------------------------------------
-# SANITY CHECK: Compare with random baseline
-# ----------------------------------------------------------------------------------
-print("\n" + "=" * 60)
-print("BASELINE COMPARISON")
-print("-" * 50)
-
-# Random baseline: uniform distribution over vocab
-random_loss = -mx.log(mx.array(1.0 / vocab_size)).item()
-print(f"Random baseline loss: {random_loss:.4f}")
-
-if losses['val'] < random_loss * 0.9:
-    print("✓ Model is learning! (Val loss < 90% of random baseline)")
-else:
-    print("✗ Model may not be learning properly")
-
-# ----------------------------------------------------------------------------------
-# SIMPLE GENERATION TEST
-# ----------------------------------------------------------------------------------
-print("\n" + "=" * 60)
-print("GENERATION TEST")
-print("-" * 50)
-
-# Generate a small sample to see if it makes sense
 context = mx.zeros((1, block_size), dtype=mx.int32)
 logits = network.forward(context, save_ctx=False)
 
-# Get prediction for last position
 last_logits = logits[0, -1, :]
 probs = mx.softmax(last_logits, axis=-1)
 
-# Show top-5 predicted characters
 top_k = 5
 top_indices = mx.argsort(probs)[-top_k:][::-1]
-print(f"\nTop {top_k} predicted next characters (from empty context):")
+print(f"\nTop {top_k}:")
 for idx in top_indices:
     char = itos[int(idx)]
     prob = probs[int(idx)].item()
     print(f"  '{char}' : {prob:.4f}")
 
-print("\n" + "=" * 60)
-print("If train loss is decreasing, your framework is working!")
-print("-" * 50)
+
+# step    0: train loss 4.1722, val loss 4.1716
+# step   50: train loss 4.1667, val loss 4.1661
+# step  100: train loss 4.1598, val loss 4.1596
+# step  150: train loss 4.1530, val loss 4.1528
+# step  200: train loss 4.1462, val loss 4.1466
+# step  250: train loss 4.1395, val loss 4.1400
+# step  300: train loss 4.1326, val loss 4.1335
+# step  350: train loss 4.1261, val loss 4.1268
+# step  400: train loss 4.1193, val loss 4.1204
+# step  450: train loss 4.1127, val loss 4.1140
+# step  500: train loss 4.1065, val loss 4.1076
+# step  550: train loss 4.0997, val loss 4.1017
+# step  600: train loss 4.0937, val loss 4.0954
+# step  650: train loss 4.0869, val loss 4.0885
+# step  700: train loss 4.0805, val loss 4.0834
+# step  750: train loss 4.0744, val loss 4.0769
+# step  800: train loss 4.0680, val loss 4.0702
+# step  850: train loss 4.0614, val loss 4.0640
+# step  900: train loss 4.0555, val loss 4.0589
+# step  950: train loss 4.0498, val loss 4.0520
+# Final: train loss 4.0441, val loss 4.0456
+#
+# Top 5:
+#   ' ' : 0.0238
+#   't' : 0.0188
+#   'e' : 0.0186
+#   'i' : 0.0180
+#   'f' : 0.0174

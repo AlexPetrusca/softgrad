@@ -20,3 +20,6 @@ class Multiply(Function):
                     grad = grad * inputs[j]
             gradients.append(grad)
         return gradients
+
+
+multiply = Multiply()

@@ -35,16 +35,16 @@ class NaiveMaxPool2d(TrainableLayer):
                 w_start = x * kw
                 w_end = w_start + kw
 
-                # Extract window and find max
+                # extract window and find max
                 window = x_in[:, h_start:h_end, w_start:w_end, :]
                 x_out[:, y, x, :] = mx.max(window, axis=(1, 2))
 
-                # Store flattened indices of max values
+                # store flattened indices of max values
                 window_flat = window.reshape(batch_size, -1, c)
                 max_idx = mx.argmax(window_flat, axis=1)
                 max_indices[:, y * w_out + x, :] = max_idx
 
-        self.ctx['max_indices'] = max_indices
+        self.ctx['max_indices'] = max_indices  # save positions of maxes
         return x_out
 
     def _backward(self, dx_out: mx.array) -> mx.array:
@@ -62,14 +62,14 @@ class NaiveMaxPool2d(TrainableLayer):
                 w_start = x * kw
                 w_end = w_start + kw
 
-                # Get max indices for this output position
+                # get max indices
                 indices = max_indices[:, y * w_out + x, :, mx.newaxis]
 
-                # Create mask indicating where the max value was
+                # create mask of where the max was
                 flat_mask = mx.where(indices == mx.arange(kh * kw), 1, 0)
                 mask = flat_mask.reshape(batch_size, kh, kw, c)
 
-                # Route gradient to max position
+                # route gradient to max position
                 grad = dx_out[:, y, mx.newaxis, x, mx.newaxis, :]
                 dx_in[:, h_start:h_end, w_start:w_end, :] += grad * mask
 

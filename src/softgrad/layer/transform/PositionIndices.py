@@ -13,13 +13,11 @@ class PositionIndices(Layer):
         self.seq_length = self.input_shape[0]
         self.output_shape = self.input_shape  # Same shape as input
 
-        # Pre-compute position indices
         self.positions = mx.arange(self.seq_length)
 
     def _forward(self, x_in: mx.array) -> mx.array:
         batch_size = x_in.shape[0]
 
-        # Broadcast positions to batch dimension
         # (seq_length,) → (1, seq_length) → (batch, seq_length)
         positions = mx.expand_dims(self.positions, axis=0)
         positions = mx.broadcast_to(positions, (batch_size, self.seq_length))
@@ -27,5 +25,4 @@ class PositionIndices(Layer):
         return positions
 
     def _backward(self, dx_out: mx.array) -> mx.array:
-        # No gradient flows to input (positions are independent of input)
-        return mx.zeros(dx_out.shape, dtype=mx.float32)
+        return mx.zeros(dx_out.shape, dtype=mx.float32)  # No gradient
