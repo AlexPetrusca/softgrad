@@ -61,16 +61,18 @@ class MaxPool2d(Layer):
         mask_sum = mx.sum(mask, axis=(3, 4), keepdims=True)
         mask = mask / mx.maximum(mask_sum, 1.0)
 
-        # for each window, route gradient through the mask
+        # accumulate gradients for each window, route gradient through mask
         dx_out_expanded = dx_out[:, :, :, mx.newaxis, mx.newaxis, :]
         dx_windows = dx_out_expanded * mask  # (batch, h_out, w_out, kh, kw, C)
         dx_in = mx.zeros((batch_size, h_in, w_in, c))
         for i in range(h_out):
             for j in range(w_out):
+                # calculate where this window came from in the input
                 h_start = i * sh
                 w_start = j * sw
                 h_end = h_start + kh
                 w_end = w_start + kw
+                # Put gradient back into correct input region
                 dx_in[:, h_start:h_end, w_start:w_end, :] += dx_windows[:, i, j, :, :, :]
 
         return dx_in

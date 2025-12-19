@@ -91,10 +91,12 @@ class Conv2d(TrainableLayer):
         # accumulate gradients for each window
         for i in range(h_out):
             for j in range(w_out):
+                # calculate where this window came from in the input
                 h_start = i * self.stride[0]
                 h_end = h_start + kh
                 w_start = j * self.stride[1]
                 w_end = w_start + kw
+                # Put gradient back into correct input region
                 dx_in_padded[:, h_start:h_end, w_start:w_end, :] += dx_windows[:, i, j, :, :, :]
 
         # remove padding from gradient (if necessary)
