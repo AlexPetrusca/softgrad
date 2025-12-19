@@ -1,26 +1,167 @@
 import mlx.core as mx
 import numpy as np
-from softgrad import Network
-from softgrad.layer.shim import MLX
-from vgg16_mlx import load_vgg16_weights
-from image_utils_mlx import read_image_mlx, write_image_mlx
+from mlx import nn
+from image_utils import read_image_mlx, write_image_mlx
+from torchvision import models
 
 
-class DeepDreamNetwork:
-    def __init__(self, model_name="vgg16"):
-        print(f"Loading {model_name}...")
-        if model_name == "vgg16":
-            self.mlx_model = load_vgg16_weights()
-        else:
-            raise ValueError(f"Model {model_name} not supported yet")
+class VGG16(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        # Block 1
+        self.conv1_1 = nn.Conv2d(3, 64, kernel_size=3, padding=1)
+        self.conv1_2 = nn.Conv2d(64, 64, kernel_size=3, padding=1)
+        self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        # Block 2
+        self.conv2_1 = nn.Conv2d(64, 128, kernel_size=3, padding=1)
+        self.conv2_2 = nn.Conv2d(128, 128, kernel_size=3, padding=1)
+        self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        # Block 3
+        self.conv3_1 = nn.Conv2d(128, 256, kernel_size=3, padding=1)
+        self.conv3_2 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.conv3_3 = nn.Conv2d(256, 256, kernel_size=3, padding=1)
+        self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        # Block 4
+        self.conv4_1 = nn.Conv2d(256, 512, kernel_size=3, padding=1)
+        self.conv4_2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.conv4_3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        # Block 5
+        self.conv5_1 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.conv5_2 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.conv5_3 = nn.Conv2d(512, 512, kernel_size=3, padding=1)
+        self.pool5 = nn.MaxPool2d(kernel_size=2, stride=2)
+
+        self.layers = {
+            'conv1_1': self.conv1_1, 'conv1_2': self.conv1_2, 'pool1': self.pool1,
+            'conv2_1': self.conv2_1, 'conv2_2': self.conv2_2, 'pool2': self.pool2,
+            'conv3_1': self.conv3_1, 'conv3_2': self.conv3_2, 'conv3_3': self.conv3_3, 'pool3': self.pool3,
+            'conv4_1': self.conv4_1, 'conv4_2': self.conv4_2, 'conv4_3': self.conv4_3, 'pool4': self.pool4,
+            'conv5_1': self.conv5_1, 'conv5_2': self.conv5_2, 'conv5_3': self.conv5_3, 'pool5': self.pool5,
+        }
+
+        self.load_pretrained_weights()
+
+    def __call__(self, x, return_layers=None):
+        activations = {}
+
+        # Block 1
+        x = nn.relu(self.conv1_1(x))
+        if return_layers and 'conv1_1' in return_layers:
+            activations['conv1_1'] = x
+
+        x = nn.relu(self.conv1_2(x))
+        if return_layers and 'conv1_2' in return_layers:
+            activations['conv1_2'] = x
+
+        x = self.pool1(x)
+        if return_layers and 'pool1' in return_layers:
+            activations['pool1'] = x
+
+        # Block 2
+        x = nn.relu(self.conv2_1(x))
+        if return_layers and 'conv2_1' in return_layers:
+            activations['conv2_1'] = x
+
+        x = nn.relu(self.conv2_2(x))
+        if return_layers and 'conv2_2' in return_layers:
+            activations['conv2_2'] = x
+
+        x = self.pool2(x)
+        if return_layers and 'pool2' in return_layers:
+            activations['pool2'] = x
+
+        # Block 3
+        x = nn.relu(self.conv3_1(x))
+        if return_layers and 'conv3_1' in return_layers:
+            activations['conv3_1'] = x
+
+        x = nn.relu(self.conv3_2(x))
+        if return_layers and 'conv3_2' in return_layers:
+            activations['conv3_2'] = x
+
+        x = nn.relu(self.conv3_3(x))
+        if return_layers and 'conv3_3' in return_layers:
+            activations['conv3_3'] = x
+
+        x = self.pool3(x)
+        if return_layers and 'pool3' in return_layers:
+            activations['pool3'] = x
+
+        # Block 4
+        x = nn.relu(self.conv4_1(x))
+        if return_layers and 'conv4_1' in return_layers:
+            activations['conv4_1'] = x
+
+        x = nn.relu(self.conv4_2(x))
+        if return_layers and 'conv4_2' in return_layers:
+            activations['conv4_2'] = x
+
+        x = nn.relu(self.conv4_3(x))
+        if return_layers and 'conv4_3' in return_layers:
+            activations['conv4_3'] = x
+
+        x = self.pool4(x)
+        if return_layers and 'pool4' in return_layers:
+            activations['pool4'] = x
+
+        # Block 5
+        x = nn.relu(self.conv5_1(x))
+        if return_layers and 'conv5_1' in return_layers:
+            activations['conv5_1'] = x
+
+        x = nn.relu(self.conv5_2(x))
+        if return_layers and 'conv5_2' in return_layers:
+            activations['conv5_2'] = x
+
+        x = nn.relu(self.conv5_3(x))
+        if return_layers and 'conv5_3' in return_layers:
+            activations['conv5_3'] = x
+
+        x = self.pool5(x)
+        if return_layers and 'pool5' in return_layers:
+            activations['pool5'] = x
+
+        if return_layers:
+            return activations
+        return x
+
+    def load_pretrained_weights(self):
+        torch_model = models.vgg16(weights=models.VGG16_Weights.IMAGENET1K_V1)
+        torch_features = torch_model.features
+
+        pytorch_to_mlx_mapping = {
+            0: 'conv1_1', 2: 'conv1_2',
+            5: 'conv2_1', 7: 'conv2_2',
+            10: 'conv3_1', 12: 'conv3_2', 14: 'conv3_3',
+            17: 'conv4_1', 19: 'conv4_2', 21: 'conv4_3',
+            24: 'conv5_1', 26: 'conv5_2', 28: 'conv5_3',
+        }
+
+        for torch_idx, mlx_name in pytorch_to_mlx_mapping.items():
+            torch_conv = torch_features[torch_idx]
+            mlx_conv = self.layers[mlx_name]
+
+            # convert weights from pytorch to mlx
+            weight = torch_conv.weight.detach().numpy()
+            weight = np.transpose(weight, (0, 2, 3, 1))  # (out_ch, in_ch, H, W) -> (out_ch, H, W, in_ch)
+            mlx_conv.weight = mx.array(weight)
+            if torch_conv.bias is not None:
+                bias = torch_conv.bias.detach().numpy()
+                mlx_conv.bias = mx.array(bias)
 
     def get_activations(self, img_tensor, layer_names):
-        return self.mlx_model(img_tensor, return_layers=layer_names)
+        return self(img_tensor, return_layers=layer_names)
 
     def compute_loss_and_gradients(self, img_tensor, layer_names):
         # Define loss function
         def loss_fn(img):
-            activations = self.mlx_model(img, return_layers=layer_names)
+            activations = self(img, return_layers=layer_names)
             loss = sum(mx.mean(act) for act in activations.values())
             return loss
 
@@ -52,7 +193,7 @@ def deep_dream_simple(
     print(f"Image shape: {img_tensor.shape}")
 
     # Load model
-    dream = DeepDreamNetwork("vgg16")
+    dream = VGG16()
 
     # Gradient ascent loop
     for iter in range(n_iterations):
@@ -71,7 +212,6 @@ def deep_dream_simple(
 
     # Save result
     write_image_mlx(output_path, img_tensor)
-    print(f"✓ Saved to {output_path}")
 
 
 def deep_dream_with_jitter(
@@ -91,7 +231,7 @@ def deep_dream_with_jitter(
     print(f"Jitter: {jitter}px")
 
     img_tensor = read_image_mlx(img_path, target_shape=target_size)
-    dream = DeepDreamNetwork("vgg16")
+    dream = VGG16()
 
     def random_shift(tensor, h_shift, w_shift):
         """Circularly shift the image"""
@@ -124,7 +264,6 @@ def deep_dream_with_jitter(
             print(f"Iteration {iter:3d}, loss: {loss.item():.4f}")
 
     write_image_mlx(output_path, img_tensor)
-    print(f"✓ Saved to {output_path}")
 
 
 def deep_dream_octaves(
@@ -154,7 +293,7 @@ def deep_dream_octaves(
     img_tensor = read_image_mlx(img_path, target_shape=target_size)
     base_shape = img_tensor.shape[1:3]  # (H, W)
 
-    dream = DeepDreamNetwork("vgg16")
+    dream = VGG16()
 
     def random_shift(tensor, h_shift, w_shift):
         """Circularly shift the image"""
@@ -214,52 +353,45 @@ def deep_dream_octaves(
                 print(f"  Iter {iter:2d}, loss: {loss.item():.4f}")
 
     write_image_mlx(output_path, img_tensor)
-    print(f"✓ Saved to {output_path}")
 
 
-# ============================================================================
-# USAGE EXAMPLES
-# ============================================================================
+# -----------------------------------------------------------------------------
+# Generate
+# -----------------------------------------------------------------------------
+deep_dream_simple(
+    img_path="in/starry_night.png",
+    output_path="out/shimmed/dream_simple.png",
+    layer_names=['conv4_3'],
+    n_iterations=20,
+    learning_rate=0.3
+)
 
-if __name__ == "__main__":
-    # Example 1: Simple DeepDream
-    deep_dream_simple(
-        img_path="in/starry_night.png",
-        output_path="out/shimmed/dream_simple.png",
-        layer_names=['conv4_3'],
-        n_iterations=20,
-        learning_rate=0.3
-    )
+deep_dream_with_jitter(
+    img_path="in/starry_night.png",
+    output_path="out/shimmed/dream_jitter.png",
+    layer_names=['conv4_3'],
+    n_iterations=20,
+    learning_rate=0.3,
+    jitter=32
+)
 
-    # Example 2: With jitter
-    deep_dream_with_jitter(
-        img_path="in/starry_night.png",
-        output_path="out/shimmed/dream_jitter.png",
-        layer_names=['conv4_3'],
-        n_iterations=20,
-        learning_rate=0.3,
-        jitter=32
-    )
+deep_dream_octaves(
+    img_path="in/starry_night.png",
+    output_path="out/shimmed/dream_octaves.png",
+    layer_names=['conv4_3', 'conv5_2'],
+    octaves=4,
+    octave_scale=1.4,
+    n_iterations=10,
+    learning_rate=0.1,
+    jitter=32,
+    target_size=800
+)
 
-    # Example 3: Multi-octave (best quality)
+for i, layer in enumerate(['conv3_3', 'conv4_2', 'conv4_3', 'conv5_1', 'conv5_3']):
     deep_dream_octaves(
         img_path="in/starry_night.png",
-        output_path="out/shimmed/dream_octaves.png",
-        layer_names=['conv4_3', 'conv5_2'],  # Multiple layers
-        octaves=4,
-        octave_scale=1.4,
-        n_iterations=10,
-        learning_rate=0.1,
-        jitter=32,
-        target_size=800
+        output_path=f"out/shimmed/dream_layer_{layer}.png",
+        layer_names=[layer],
+        octaves=3,
+        n_iterations=10
     )
-
-    # Example 4: Explore different layers
-    for i, layer in enumerate(['conv3_3', 'conv4_2', 'conv4_3', 'conv5_1', 'conv5_3']):
-        deep_dream_octaves(
-            img_path="in/starry_night.png",
-            output_path=f"out/shimmed/dream_layer_{layer}.png",
-            layer_names=[layer],
-            octaves=3,
-            n_iterations=10
-        )

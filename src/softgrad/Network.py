@@ -1,7 +1,7 @@
 import mlx.core as mx
 from softgrad.Checkpoint import Checkpoint
 from softgrad.layer.Layer import Layer
-
+from softgrad.util.pytorch_loader import load_pytorch_weights_into_network
 
 class Network():
     def __init__(self, input_shape: tuple | int, layers=None):
@@ -55,6 +55,5 @@ class Network():
         for layer, params in zip(self.layers, checkpoint.params):
             layer.params = params
 
-    def load_from_pytorch(self, pytorch_model, layer_mapping=None, verbose=True):
-        from softgrad.util.pytorch_loader import load_pytorch_weights_into_network
-        load_pytorch_weights_into_network(self, pytorch_model, layer_mapping, verbose)
+    def load_from_pytorch(self, pytorch_model, layer_mapping=None):
+        load_pytorch_weights_into_network(self, pytorch_model, layer_mapping)

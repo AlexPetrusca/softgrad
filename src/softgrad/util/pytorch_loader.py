@@ -1,5 +1,3 @@
-# softgrad/util/pytorch_loader.py
-
 import mlx.core as mx
 import numpy as np
 import torch
@@ -8,73 +6,28 @@ from softgrad.layer.core import Linear
 
 
 def convert_pytorch_conv2d_weights(weight_torch, bias_torch=None):
-    """
-    Convert PyTorch Conv2d weights to your framework format
-
-    PyTorch: (out_channels, in_channels, kernel_h, kernel_w)
-    Your framework: (kernel_h, kernel_w, in_channels, out_channels)
-
-    Args:
-        weight_torch: PyTorch weight tensor
-        bias_torch: PyTorch bias tensor (optional)
-
-    Returns:
-        weight_mlx, bias_mlx (or None)
-    """
-    # Convert to numpy
     weight_np = weight_torch.detach().cpu().numpy()
-
-    # Transpose: (out, in, h, w) -> (h, w, in, out)
-    # Axes: 0=out, 1=in, 2=h, 3=w -> want: 2=h, 3=w, 1=in, 0=out
-    weight_np = np.transpose(weight_np, (2, 3, 1, 0))  # ← FIXED THIS LINE
-
-    # Convert to MLX
+    weight_np = np.transpose(weight_np, (2, 3, 1, 0))  # (out, in, h, w) -> (h, w, in, out)
     weight_mlx = mx.array(weight_np)
-
-    # Convert bias if present
     bias_mlx = None
     if bias_torch is not None:
         bias_np = bias_torch.detach().cpu().numpy()
         bias_mlx = mx.array(bias_np)
-
     return weight_mlx, bias_mlx
 
 
 def convert_pytorch_linear_weights(weight_torch, bias_torch=None):
-    """
-    Convert PyTorch Linear weights to your framework format
-
-    PyTorch: (out_features, in_features)
-    Your framework: (in_features, out_features)
-
-    Args:
-        weight_torch: PyTorch weight tensor
-        bias_torch: PyTorch bias tensor (optional)
-
-    Returns:
-        weight_mlx, bias_mlx (or None)
-    """
-    # Convert to numpy and transpose
     weight_np = weight_torch.detach().cpu().numpy()
     weight_np = weight_np.T  # (out, in) -> (in, out)
     weight_mlx = mx.array(weight_np)
-
-    # Convert bias
     bias_mlx = None
     if bias_torch is not None:
         bias_np = bias_torch.detach().cpu().numpy()
         bias_mlx = mx.array(bias_np)
-
     return weight_mlx, bias_mlx
 
 
 def extract_pytorch_conv_layers(pytorch_model):
-    """
-    Extract all Conv2d layers from a PyTorch model in order
-
-    Returns:
-        List of (name, layer) tuples for Conv2d layers
-    """
     conv_layers = []
     for name, module in pytorch_model.named_modules():
         if isinstance(module, torch.nn.Conv2d):
@@ -83,12 +36,6 @@ def extract_pytorch_conv_layers(pytorch_model):
 
 
 def extract_pytorch_linear_layers(pytorch_model):
-    """
-    Extract all Linear layers from a PyTorch model in order
-
-    Returns:
-        List of (name, layer) tuples for Linear layers
-    """
     linear_layers = []
     for name, module in pytorch_model.named_modules():
         if isinstance(module, torch.nn.Linear):
@@ -96,100 +43,66 @@ def extract_pytorch_linear_layers(pytorch_model):
     return linear_layers
 
 
-def load_pytorch_weights_into_network(network, pytorch_model, layer_mapping=None, verbose=True):
-    """
-    Load PyTorch weights into your network
-
-    Args:
-        network: Your Network instance
-        pytorch_model: PyTorch model or submodule
-        layer_mapping: Optional dict {pytorch_name_or_idx: your_layer_idx}
-        verbose: Print progress
-    """
+def load_pytorch_weights_into_network(network, pytorch_model, layer_mapping=None):
     if layer_mapping is None:
-        # Auto-mapping: match Conv2d and Linear layers in order
-        layer_mapping = _auto_map_layers(network, pytorch_model)
+        layer_mapping = _auto_map_layers(network, pytorch_model) # auto-map
 
-    # Load weights
     loaded_count = 0
-    for pt_identifier, your_idx in layer_mapping.items():
+    for pytorch_id, id in layer_mapping.items():
         # Get PyTorch layer
-        if isinstance(pt_identifier, int):
-            # If pytorch_model is Sequential, access by index
-            pt_layer = list(pytorch_model.children())[pt_identifier]
+        if isinstance(pytorch_id, int):
+            pytorch_layer = list(pytorch_model.children())[pytorch_id]
         else:
-            # Access by name
-            pt_layer = dict(pytorch_model.named_modules())[pt_identifier]
+            pytorch_layer = dict(pytorch_model.named_modules())[pytorch_id]
 
-        # Get your layer
-        your_layer = network.layers[your_idx]
+        # Get SoftGrad layer
+        layer = network.layers[id]
 
-        # Load weights based on layer type
-        if isinstance(pt_layer, torch.nn.Conv2d) and isinstance(your_layer, Conv2d):
+        # Load weights
+        if isinstance(pytorch_layer, torch.nn.Conv2d) and isinstance(layer, Conv2d):
             weight_mlx, bias_mlx = convert_pytorch_conv2d_weights(
-                pt_layer.weight,
-                pt_layer.bias
+                pytorch_layer.weight,
+                pytorch_layer.bias
             )
-            your_layer.params["W"] = weight_mlx
+            layer.params["W"] = weight_mlx
             if bias_mlx is not None:
-                your_layer.params["b"] = bias_mlx
+                layer.params["b"] = bias_mlx
 
-            if verbose:
-                print(f"✓ Loaded Conv2d: {pt_identifier} -> layer {your_idx} | W: {weight_mlx.shape}")
             loaded_count += 1
-
-        elif isinstance(pt_layer, torch.nn.Linear) and isinstance(your_layer, Linear):
+        elif isinstance(pytorch_layer, torch.nn.Linear) and isinstance(layer, Linear):
             weight_mlx, bias_mlx = convert_pytorch_linear_weights(
-                pt_layer.weight,
-                pt_layer.bias
+                pytorch_layer.weight,
+                pytorch_layer.bias
             )
-            your_layer.params["W"] = weight_mlx
+            layer.params["W"] = weight_mlx
             if bias_mlx is not None:
-                your_layer.params["b"] = bias_mlx
+                layer.params["b"] = bias_mlx
 
-            if verbose:
-                print(f"✓ Loaded Linear: {pt_identifier} -> layer {your_idx} | W: {weight_mlx.shape}")
             loaded_count += 1
 
-        else:
-            if verbose:
-                print(f"⚠ Skipped {pt_identifier} -> layer {your_idx} (type mismatch)")
 
-    if verbose:
-        print(f"\n✓ Loaded {loaded_count} layers successfully")
-
-
-def _auto_map_layers(network, pytorch_model):
-    """
-    Automatically map PyTorch layers to your network layers
-    Matches Conv2d and Linear layers in order
-    """
-    # Extract PyTorch Conv2d layers
-    pt_conv_layers = extract_pytorch_conv_layers(pytorch_model)
-
-    # Extract your Conv2d layers
-    your_conv_indices = [
+def _auto_map_layers(network, pytorch_network):
+    pytorch_convs = extract_pytorch_conv_layers(pytorch_network)
+    convs = [
         i for i, layer in enumerate(network.layers)
         if isinstance(layer, Conv2d)
     ]
 
-    if len(pt_conv_layers) != len(your_conv_indices):
-        print(f"Warning: PyTorch has {len(pt_conv_layers)} Conv2d layers, "
-              f"your network has {len(your_conv_indices)} Conv2d layers")
+    if len(pytorch_convs) != len(convs):
+        raise Exception("Number of conv layers does not match number of conv layers")
 
     # Create mapping
     mapping = {}
-    for (pt_name, pt_layer), your_idx in zip(pt_conv_layers, your_conv_indices):
-        mapping[pt_name] = your_idx
+    for (pytorch_name, pytorch_layer), idx in zip(pytorch_convs, convs):
+        mapping[pytorch_name] = idx
 
-    # Also handle Linear layers if present
-    pt_linear_layers = extract_pytorch_linear_layers(pytorch_model)
-    your_linear_indices = [
+    pytorch_linears = extract_pytorch_linear_layers(pytorch_network)
+    linear_indices = [
         i for i, layer in enumerate(network.layers)
         if isinstance(layer, Linear)
     ]
 
-    for (pt_name, pt_layer), your_idx in zip(pt_linear_layers, your_linear_indices):
-        mapping[pt_name] = your_idx
+    for (pytorch_name, pytorch_layer), idx in zip(pytorch_linears, linear_indices):
+        mapping[pytorch_name] = idx
 
     return mapping

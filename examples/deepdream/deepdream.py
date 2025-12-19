@@ -1,9 +1,7 @@
-# deepdream_native.py - Complete implementation using your framework
-
 import mlx.core as mx
 import numpy as np
 from load_vgg16 import load_vgg16_pretrained
-from image_utils_mlx import read_image_mlx, write_image_mlx
+from image_utils import read_image_mlx, write_image_mlx
 
 
 # ============================================================================
@@ -152,18 +150,6 @@ def deep_dream_simple(
         target_size=500,
         use_manual_backward=False
 ):
-    """
-    Simple DeepDream using your native framework
-
-    Args:
-        img_path: Input image path
-        output_path: Output image path
-        layer_names: Layers to maximize (e.g., ['conv4_3'])
-        n_iterations: Number of gradient ascent steps
-        learning_rate: Step size
-        target_size: Resize width
-        use_manual_backward: Use manual backward (True) or hybrid MLX autodiff (False)
-    """
     if layer_names is None:
         layer_names = ['conv4_3']
 
@@ -200,7 +186,6 @@ def deep_dream_simple(
 
     # Save result
     write_image_mlx(output_path, img_tensor)
-    print(f"✓ Saved to {output_path}")
 
 
 def deep_dream_with_jitter(
@@ -256,7 +241,6 @@ def deep_dream_with_jitter(
             print(f"Iteration {iter:3d}, loss: {loss.item():.4f}")
 
     write_image_mlx(output_path, img_tensor)
-    print(f"✓ Saved to {output_path}")
 
 
 def deep_dream_octaves(
@@ -340,54 +324,47 @@ def deep_dream_octaves(
                 print(f"  Iter {iter:2d}, loss: {loss.item():.4f}")
 
     write_image_mlx(output_path, img_tensor)
-    print(f"✓ Saved to {output_path}")
 
 
-# ============================================================================
-# USAGE EXAMPLES
-# ============================================================================
+# -----------------------------------------------------------------------------
+# Generate
+# -----------------------------------------------------------------------------
+deep_dream_simple(
+    img_path="in/starry_night.png",
+    output_path="out/native/dream_simple.png",
+    layer_names=['conv4_3'],
+    n_iterations=20,
+    learning_rate=0.3,
+    use_manual_backward=False
+)
 
-if __name__ == "__main__":
-    # Example 1: Simple DeepDream with hybrid approach
-    deep_dream_simple(
-        img_path="in/starry_night.png",
-        output_path="out/native/dream_simple.png",
-        layer_names=['conv4_3'],
-        n_iterations=20,
-        learning_rate=0.3,
-        use_manual_backward=False  # Use hybrid MLX autodiff
-    )
+deep_dream_with_jitter(
+    img_path="in/starry_night.png",
+    output_path="out/native/dream_jitter.png",
+    layer_names=['conv4_3'],
+    n_iterations=20,
+    learning_rate=0.3,
+    jitter=32
+)
 
-    # Example 2: With jitter
-    deep_dream_with_jitter(
-        img_path="in/starry_night.png",
-        output_path="out/native/dream_jitter.png",
-        layer_names=['conv4_3'],
-        n_iterations=20,
-        learning_rate=0.3,
-        jitter=32
-    )
+deep_dream_octaves(
+    img_path="in/starry_night.png",
+    output_path="out/native/dream_octaves.png",
+    layer_names=['conv4_3', 'conv5_2'],
+    octaves=4,
+    octave_scale=1.4,
+    n_iterations=10,
+    learning_rate=0.1,
+    jitter=32,
+    target_size=800
+)
 
-    # Example 3: Multi-octave (best quality)
+for layer in ['conv3_3', 'conv4_2', 'conv4_3', 'conv5_1', 'conv5_3']:
     deep_dream_octaves(
         img_path="in/starry_night.png",
-        output_path="out/native/dream_octaves.png",
-        layer_names=['conv4_3', 'conv5_2'],
-        octaves=4,
-        octave_scale=1.4,
-        n_iterations=10,
-        learning_rate=0.1,
-        jitter=32,
-        target_size=800
+        output_path=f"out/native/dream_{layer}.png",
+        layer_names=[layer],
+        octaves=3,
+        n_iterations=10
     )
-
-    # Example 4: Explore different layers
-    for layer in ['conv3_3', 'conv4_2', 'conv4_3', 'conv5_1', 'conv5_3']:
-        deep_dream_octaves(
-            img_path="in/starry_night.png",
-            output_path=f"out/native/dream_{layer}.png",
-            layer_names=[layer],
-            octaves=3,
-            n_iterations=10
-        )
 
