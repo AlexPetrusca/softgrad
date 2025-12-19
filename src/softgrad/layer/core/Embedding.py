@@ -26,8 +26,7 @@ class Embedding(TrainableLayer):
         indices_flat = indices.reshape(-1)
         dx_out_flat = dx_out.reshape(-1, self.embedding_dim)
 
-        # Use bincount-style accumulation for efficiency
-        # Create one-hot encoding for each index
+        # Add up one-hot encodings for each index, instead of individual update
         for idx in range(self.num_embeddings):
             mask = (indices_flat == idx).astype(mx.float32)
             if mx.sum(mask) > 0:
