@@ -4,4 +4,4 @@ __pycache__
 .git
 .DS_Store
 softgrad.egg-info
-*.pb
+rsc
