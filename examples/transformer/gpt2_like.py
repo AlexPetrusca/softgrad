@@ -1,7 +1,9 @@
 import math
+import os
 
 import mlx.core as mx
 import numpy as np
+import tiktoken
 from mlx import nn
 
 from softgrad import Network
@@ -101,138 +103,112 @@ mx.random.seed(1337)
 # ============================================================================
 # HYPERPARAMETERS
 # ============================================================================
+vocab_size = 50257
 batch_size = 64
-block_size = 256
+block_size = 1024
 max_iters = 5000
 eval_interval = 100
-learning_rate = 3e-4
+learning_rate = 3e-3
 eval_iters = 200
 n_embd = 768
-n_head = 6
-n_layer = 6
+n_head = 12
+n_layer = 12
 
 # ============================================================================
 # DATA LOADING
 # ============================================================================
-with open('rsc/tinyshakespeare.txt', 'r', encoding='utf-8') as f:
-    text = f.read()
 
-chars = sorted(list(set(text)))
-vocab_size = len(chars)
-stoi = {ch: i for i, ch in enumerate(chars)}
-itos = {i: ch for i, ch in enumerate(chars)}
-encode = lambda s: [stoi[c] for c in s]
-decode = lambda l: ''.join([itos[i] for i in l])
+def load_tokens(filename):
+    npt = np.load(filename)
+    npt = npt.astype(np.int32) # added after video
+    ptt = mx.array(npt, dtype=mx.uint32)
+    return ptt
 
-data = mx.array(encode(text))
-n = int(0.9 * len(data))
-train_data = data[:n]
-val_data = data[n:]
+class DataLoaderLite:
+    def __init__(self, B, T, split):
+        self.B = B
+        self.T = T
+        assert split in {'train', 'val'}
 
+        # get the shard filenames
+        data_root = "rsc/bookcorpus"
+        shards = os.listdir(data_root)
+        shards = [s for s in shards if split in s]
+        shards = sorted(shards)
+        shards = [os.path.join(data_root, s) for s in shards]
+        self.shards = shards
+        assert len(shards) > 0, f"no shards found for split {split}"
+        print(f"found {len(shards)} shards for split {split}")
+        self.reset()
 
-def get_batch(split):
-    data_split = train_data if split == 'train' else val_data
-    ix = mx.random.randint(0, len(data_split) - block_size, (batch_size,))
-    x = mx.stack([data_split[int(i):int(i) + block_size] for i in ix])
-    y = mx.stack([data_split[int(i) + 1:int(i) + block_size + 1] for i in ix])
-    return x, y
+    def reset(self):
+        # state, init at shard zero
+        self.current_shard = 0
+        self.tokens = load_tokens(self.shards[self.current_shard])
+        self.current_position = 0
 
+    def next_batch(self):
+        B, T = self.B, self.T
+        buf = self.tokens[self.current_position : self.current_position+B*T+1]
+        x = (buf[:-1]).reshape(B, T) # inputs
+        y = (buf[1:]).reshape(B, T) # targets
+        # advance the position in the tensor
+        self.current_position += B * T
+        # if loading the next batch would be out of bounds, advance to next shard
+        if self.current_position + (B * T + 1) > len(self.tokens):
+            self.current_shard = (self.current_shard + 1) % len(self.shards)
+            self.tokens = load_tokens(self.shards[self.current_shard])
+            self.current_position = 0
+        return x, y
 
-def generate_text(network, start_text="", max_new_tokens=500, temperature=1.0, top_k=None):
-    """
-    Generate text from the model.
-
-    Args:
-        network: Your trained Network
-        start_text: Starting prompt (empty string for unconditional generation)
-        max_new_tokens: Number of tokens to generate
-        temperature: Sampling temperature (higher = more random)
-        top_k: If set, only sample from top k most likely tokens
-    """
-    # Encode the starting text
-    if start_text:
-        context = encode(start_text)
-    else:
-        context = [0]  # Start with a single token (could be any token)
-
-    context = list(context)  # Make it mutable
-
-    for _ in range(max_new_tokens):
-        # Take the last block_size tokens (or pad if shorter)
-        if len(context) < block_size:
-            # Pad with zeros on the left
-            context_padded = [0] * (block_size - len(context)) + context
-        else:
-            # Take last block_size tokens
-            context_padded = context[-block_size:]
-
-        # Convert to array with batch dimension
-        context_array = mx.array(context_padded)[None, :]  # (1, block_size)
-
-        # Get predictions
-        logits = network.forward(context_array, save_ctx=False)  # (1, block_size, vocab_size)
-
-        # Focus on the last time step (the position we're predicting)
-        # If we padded, we want the position corresponding to our actual sequence length
-        if len(context) < block_size:
-            # Prediction is at position len(context) - 1 (due to padding)
-            logits = logits[:, len(context) - 1, :]  # (1, vocab_size)
-        else:
-            # Prediction is at the last position
-            logits = logits[:, -1, :]  # (1, vocab_size)
-
-        # Apply temperature
-        logits = logits / temperature
-
-        # Optionally crop to top k tokens
-        if top_k is not None:
-            # Get top k values and indices
-            top_values = mx.sort(logits[0])[-top_k:]
-            threshold = top_values[0]
-
-            # Mask out tokens below threshold
-            logits_filtered = mx.where(logits[0] >= threshold, logits[0], float('-inf'))
-            logits = logits_filtered[None, :]  # Add batch dim back
-
-        # Convert to probabilities
-        probs = mx.softmax(logits, axis=-1)  # (1, vocab_size)
-
-        # Sample from the distribution
-        idx_next = mx.random.categorical(mx.log(probs[0]), num_samples=1)  # (1,)
-
-        # Append to sequence
-        context.append(int(idx_next[0]))
-
-    # Decode only the generated tokens (skip the initial context)
-    if start_text:
-        generated_tokens = context[len(encode(start_text)):]
-    else:
-        generated_tokens = context[1:]  # Skip the initial [0]
-
-    return decode(generated_tokens)
-
-
-def generate_with_prompt(network, prompt, num_samples=3, max_new_tokens=200, temperature=0.8):
-    """Generate multiple samples from a prompt"""
-    print(f"\nPrompt: '{prompt}'")
-    print("=" * 80)
-
-    for i in range(num_samples):
-        print(f"\n--- Sample {i + 1} ---")
-        generated = generate_text(
-            network,
-            start_text=prompt,
-            max_new_tokens=max_new_tokens,
-            temperature=temperature,
-            top_k=None  # Can set to 40 for more focused sampling
-        )
-        print(prompt + generated)
-        print()
 
 
 # ============================================================================
 # SETUP NETWORK AND OPTIMIZER
 # ============================================================================
+
+enc = tiktoken.get_encoding("gpt2")
+
+# data loaders
+B = 8  # micro batch size
+T = 1024  # sequence length
+
+train_loader = DataLoaderLite(B=B, T=T, split="train")
+val_loader = DataLoaderLite(B=B, T=T, split="val")
+# print(f"Training a transformer with {nparams / 1024**2:.3f} M parameters")
+
+
+def generate_with_prompt(network, prompt: str = "Hello, I'm a language model,"):
+    num_return_sequences = 4
+    max_length = 32
+    tokens = enc.encode(prompt)
+    tokens = mx.array(tokens, dtype=mx.int32)  # (8 tokens,)
+    xgen = mx.repeat(mx.expand_dims(tokens, axis=0), num_return_sequences, axis=0)  # (5 rows, 8 tokens)
+    while xgen.shape[1] < max_length:
+        # forward the model to get the logits
+        logits = network.forward(xgen)  # (B, T, vocab_size)
+        # take the logits at the last position
+        logits = logits[:, -1, :]  # (B, vocab_size)
+        # get the probabilities
+        probs = nn.softmax(logits, axis=-1)
+
+        # get the top k probabilities
+        k = 50
+        topk_indices = mx.argsort(logits, axis=-1)[:, -k:]
+        topk_logits = mx.sort(logits, axis=-1)[:, -k:]
+
+        # select a token from the top probabilities
+        ix = mx.random.categorical(topk_logits, num_samples=1)  # (B, 1)
+        xcol = mx.take_along_axis(topk_indices, indices=ix, axis=-1)
+
+        xgen = mx.concatenate([xgen, xcol], axis=1)
+    # print the generated text
+    for i in range(num_return_sequences):
+        tokens = xgen[i, :max_length].tolist()
+        decoded = enc.decode(tokens)
+        print(f"sample {i}: {decoded}")
+
+
 print("Setting up network...")
 network = Network(input_shape=(block_size,))
 network.add_layer(Parallel([
@@ -263,7 +239,10 @@ def estimate_loss():
     for split in ['train', 'val']:
         losses = []
         for k in range(eval_iters):
-            X, Y = get_batch(split)
+            if split == "train":
+                X, Y = train_loader.next_batch()
+            else:
+                X, Y = val_loader.next_batch()
 
             # Forward pass
             logits = network.forward(X, save_ctx=False)
@@ -292,11 +271,11 @@ for iter in range(max_iters):
         print(f"step {iter:4d}: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
         if iter % (eval_interval * 5):
-            generate_with_prompt(network, "First Citizen:\n", 2)
+            generate_with_prompt(network)
 
     # Get batch
     print(".", end="")
-    xb, yb = get_batch('train')
+    xb, yb = train_loader.next_batch()
 
     # Optimization step (forward + backward + update)
     optimizer.step(xb, yb)
@@ -318,5 +297,6 @@ print("\n" + "=" * 80)
 print("TEXT GENERATION")
 print("=" * 80)
 
-generate_with_prompt(network, "First Citizen:\n", 5)
-generate_with_prompt(network, "To be or not to be", 5)
+generate_with_prompt(network)
+generate_with_prompt(network, "First Citizen:\n")
+generate_with_prompt(network, "To be or not to be")
