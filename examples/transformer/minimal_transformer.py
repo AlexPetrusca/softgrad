@@ -106,9 +106,9 @@ mx.random.seed(1337)
 # ============================================================================
 batch_size = 32
 block_size = 128
-max_iters = 2000        # Increased - transformers need more steps
+max_iters = 25000        # Increased - transformers need more steps
 eval_interval = 100     # Less frequent eval
-learning_rate = 3e-3    # Lower LR for transformer (more stable)
+learning_rate = 3e-2    # Lower LR for transformer (more stable)
 eval_iters = 50
 n_embd = 128
 n_head = 4              # 4 heads of size 32 each

@@ -54,3 +54,7 @@ class Network():
     def load(self, checkpoint):
         for layer, params in zip(self.layers, checkpoint.params):
             layer.params = params
+
+    def load_from_pytorch(self, pytorch_model, layer_mapping=None, verbose=True):
+        from softgrad.util.pytorch_loader import load_pytorch_weights_into_network
+        load_pytorch_weights_into_network(self, pytorch_model, layer_mapping, verbose)
