@@ -106,9 +106,13 @@ class Conv2d(TrainableLayer):
 
         return dx_in
 
-
+# todo: this is used in MaxPool2d as well, refactor out
+# sliding windows in shape: (batch, h_out, w_out, kh, kw, C_in)
+#   - batch = batch dimension (per sample)
+#   - h_out, w_out = window starting positions (index the window you want)
+#   - kh, kw = window elements (index the element you want in the window
+#   - C_in = channel dimension (per element)
 def _sliding_windows(x, window_shape, window_strides):
-    """Extract sliding windows from input tensor."""
     if x.ndim < 3:
         raise ValueError(
             f"To extract sliding windows at least 1 spatial dimension "
