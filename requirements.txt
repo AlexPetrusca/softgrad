@@ -2,9 +2,10 @@ numpy
 torch
 torchvision
 mlx
+mlx-data
 matplotlib
 ipywidgets
 pillow
 opencv-python
 tiktoken
-./softgrad
+.

@@ -10,7 +10,7 @@ from softgrad import Network
 from softgrad.function.activation import Relu, Softmax, softmax
 from softgrad.function.core import Add, Concatenate
 from softgrad.function.loss import CrossEntropyLoss, sequence_ce_loss
-from softgrad.layer.attn import CausalSelfAttentionHead
+from softgrad.layer.attn import CausalSelfAttention
 from softgrad.layer.core import Parallel, Embedding, Sequential, Linear, Residual, Activation
 from softgrad.layer.norm import LayerNorm
 from softgrad.layer.shim import MLX
@@ -75,7 +75,7 @@ class MultiHeadAttention(Sequential):
     def __init__(self, num_heads, head_size):
         super().__init__([
             Parallel(
-                [CausalSelfAttentionHead(n_embd, head_size, block_size) for _ in range(num_heads)]  # heads
+                [CausalSelfAttention(n_embd, head_size, block_size) for _ in range(num_heads)]  # heads
             , Concatenate()),
             Linear(n_embd)  # projection
         ])

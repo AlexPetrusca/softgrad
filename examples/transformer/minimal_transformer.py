@@ -8,7 +8,7 @@ from softgrad import Network
 from softgrad.function.activation import Relu, Softmax, softmax
 from softgrad.function.core import Add, Concatenate
 from softgrad.function.loss import CrossEntropyLoss, sequence_ce_loss
-from softgrad.layer.attn import CausalSelfAttentionHead
+from softgrad.layer.attn import CausalSelfAttention
 from softgrad.layer.core import Parallel, Embedding, Sequential, Linear, Residual, Activation
 from softgrad.layer.norm import LayerNorm
 from softgrad.layer.shim import MLX
@@ -18,50 +18,6 @@ from softgrad.optim import SGD
 
 # todo: We need to train with padding tokens, since prompt context is usually much smaller than window
 #   - Bug: getting bad generation until the context window is filled up
-
-class MLXCausalSelfAttention(nn.Module):
-    def __init__(self):
-        super().__init__()
-        assert n_embd % n_head == 0
-
-        self.n_heads = n_head
-        self.n_embd = n_embd
-        self.causal_mask = MLXCausalSelfAttention.create_additive_causal_mask(block_size, dtype=mx.bfloat16)
-
-        self.query_proj = nn.Linear(self.n_embd, self.n_embd)
-        self.key_proj = nn.Linear(self.n_embd, self.n_embd)
-        self.value_proj = nn.Linear(self.n_embd, self.n_embd)
-        self.out_proj = nn.Linear(self.n_embd, self.n_embd)
-
-    def __call__(self, x):
-        B, T, C = x.shape
-        # calculate query, key, value for all heads
-        q = self.query_proj(x) # (B, T, C) -> (B, T, C)
-        k = self.key_proj(x) # (B, T, C) -> (B, T, C)
-        v = self.value_proj(x) # (B, T, C) -> (B, T, C)
-
-        # reshape query, key, value to batch over n_batches x n_heads
-        #   - this way we can compute attention for all heads at once (i.e. multi-head attention) with a single matrix multiply
-        #   - nh is "number of heads", hs is "head size", and C (number of channels) = nh * hs
-        q = mx.unflatten(q, -1, (self.n_heads, -1)).transpose(0, 2, 1, 3) # (B, T, C) -> (B, T, nh, hs) -> (B, nh, T, hs)
-        k = mx.unflatten(k, -1, (self.n_heads, -1)).transpose(0, 2, 1, 3) # (B, T, C) -> (B, T, nh, hs) -> (B, nh, T, hs)
-        v = mx.unflatten(v, -1, (self.n_heads, -1)).transpose(0, 2, 1, 3) # (B, T, C) -> (B, T, nh, hs) -> (B, nh, T, hs)
-
-        # causal flash attention
-        scale = math.sqrt(1 / q.shape[-1])
-        output = mx.fast.scaled_dot_product_attention(q, k, v, scale=scale, mask=self.causal_mask[:T, :T]) # 3x(B, nh, T, hs) -> (B, nh, T, hs)
-
-        # re-assemble all head outputs side by side and project out
-        output = output.transpose(0, 2, 1, 3).flatten(-2, -1) # (B, nh, T, hs) -> (B, T, nh, hs) -> (B, T, C)
-        return self.out_proj(output) # (B, T, C) -> (B, T, C)
-
-    @staticmethod
-    def create_additive_causal_mask(N: int, dtype = mx.float32):
-        indices = mx.arange(N)
-        mask = indices[:, None] < indices[None]
-        mask = mask.astype(dtype) * mx.finfo(dtype).min
-        return mask
-
 
 class FeedForward(Sequential):
     def __init__(self, n_embd):
@@ -76,7 +32,7 @@ class MultiHeadAttention(Sequential):
     def __init__(self, num_heads, head_size):
         super().__init__([
             Parallel(
-                [CausalSelfAttentionHead(n_embd, head_size, block_size) for _ in range(num_heads)]  # heads
+                [CausalSelfAttention(n_embd, head_size, block_size) for _ in range(num_heads)]  # heads
             , Concatenate()),
             Linear(n_embd)  # projection
         ])
@@ -89,7 +45,6 @@ class TransformerBlock(Sequential):
             Residual(Sequential([
                 LayerNorm(),
                 MultiHeadAttention(n_head, n_embd // n_head)
-                # MLX(MLXCausalSelfAttention())
             ])),
             # computation
             Residual(Sequential([

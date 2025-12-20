@@ -4,7 +4,7 @@ from softgrad.layer.core import Linear
 from softgrad.function.activation import softmax
 
 
-class CausalSelfAttentionHead(Layer):
+class CausalSelfAttention(Layer):
     def __init__(self, n_embd, head_size, block_size):
         super().__init__()
         self.n_embd = n_embd

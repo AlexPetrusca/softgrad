@@ -1,1 +1,1 @@
-from softgrad.layer.attn.CausalSelfAttentionHead import CausalSelfAttentionHead
+from softgrad.layer.attn.CausalSelfAttention import CausalSelfAttention
