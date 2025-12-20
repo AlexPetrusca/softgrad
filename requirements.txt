@@ -5,4 +5,6 @@ mlx
 matplotlib
 ipywidgets
 pillow
+opencv-python
+tiktoken
 ./softgrad
