@@ -103,7 +103,8 @@ from softgrad import Network
 from softgrad.function.activation import Relu
 from softgrad.function.core import Concatenate, Add
 from softgrad.layer.attn import CausalSelfAttention
-from softgrad.layer.core import Linear, Activation, Sequential, Parallel, Residual, Embedding
+from softgrad.layer.core import Linear, Activation, Embedding
+from softgrad.layer.core import Sequential, Parallel, Residual
 from softgrad.layer.norm import LayerNorm
 from softgrad.layer.transform.PositionIndices import PositionIndices
 
@@ -123,9 +124,10 @@ class MultiHeadAttention(Sequential):
 
     def __init__(self, num_heads, head_size, block_size):
         super().__init__([
-            Parallel(
-                [CausalSelfAttention(n_embd, head_size, block_size) for _ in range(num_heads)]  # heads
-            , Concatenate()),
+            Parallel([
+                CausalSelfAttention(n_embd, head_size, block_size) # heads
+                for _ in range(num_heads)
+            ], Concatenate()),
             Linear(n_embd)  # projection
         ])
 
@@ -156,9 +158,10 @@ network.add_layer(Parallel([
 ], Add()))
 
 # Transformer blocks
-network.add_layer(Sequential(
-    [TransformerBlock(n_embd, n_head) for _ in range(n_layer)]
-))
+network.add_layer(Sequential([
+    TransformerBlock(n_embd, n_head)
+    for _ in range(n_layer)
+]))
 
 # LLM head
 network.add_layer(LayerNorm())
