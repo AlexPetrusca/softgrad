@@ -53,8 +53,8 @@ mx.random.seed(1337)
 # Hyperparameters
 # ----------------------------------------------------------------------------------
 batch_size = 32
-block_size = 128
-max_iters = 25000
+block_size = 2
+max_iters = 5000
 eval_interval = 100
 learning_rate = 3e-2
 eval_iters = 50
@@ -65,71 +65,27 @@ n_layer = 2             # 2 transformer blocks
 # ----------------------------------------------------------------------------------
 # Dataset
 # ----------------------------------------------------------------------------------
-with open('rsc/tinyshakespeare.txt', 'r', encoding='utf-8') as f:
-    text = f.read()
 
-chars = sorted(list(set(text)))
-vocab_size = len(chars)
-stoi = {ch: i for i, ch in enumerate(chars)}
-itos = {i: ch for i, ch in enumerate(chars)}
-encode = lambda s: [stoi[c] for c in s]
-decode = lambda l: ''.join([itos[i] for i in l])
+max_num = 100
+max_modulo = 20
+vocab_size = max_num + 1
 
-data = mx.array(encode(text))
-n = int(0.9 * len(data))
-train_data = data[:n]
-val_data = data[n:]
+X_train = mx.random.randint(0, max_num + 1, shape=(10000,))
+Y_train = mx.random.randint(1, max_modulo + 1, shape=(10000,))
+Z_train = X_train % Y_train
 
+X_val = mx.random.randint(0, max_num + 1, shape=(1000,))
+Y_val = mx.random.randint(1, max_modulo + 1, shape=(1000,))
+Z_val = X_val % Y_val
 
 def get_batch(split):
-    data_split = train_data if split == 'train' else val_data
-    ix = mx.random.randint(0, len(data_split) - block_size, (batch_size,))
-    x = mx.stack([data_split[int(i):int(i) + block_size] for i in ix])
-    y = mx.stack([data_split[int(i) + 1:int(i) + block_size + 1] for i in ix])
-    return x, y
+    X_split = X_train if split == 'train' else X_val
+    Y_split = Y_train if split == 'train' else Y_val
+    Z_split = Z_train if split == 'train' else Z_val
 
-
-def generate_text(network, start_text="", max_new_tokens=500, temperature=1.0, top_k=None):
-    if start_text:
-        context = encode(start_text)
-    else:
-        context = [0]
-
-    context = list(context)
-
-    for _ in range(max_new_tokens):
-        if len(context) < block_size:
-            context_padded = [0] * (block_size - len(context)) + context  # pad 0s on the left
-        else:
-            context_padded = context[-block_size:]  # take as much as we can fit into context
-
-        context_array = mx.array(context_padded)[None, :]  # (1, block_size)
-        logits = network.forward(context_array, save_ctx=False)  # (1, block_size, vocab_size)
-
-        if len(context) < block_size:
-            logits = logits[:, len(context) - 1, :]  # (1, vocab_size)
-        else:
-            logits = logits[:, -1, :]  # (1, vocab_size)
-
-        logits = logits / temperature
-
-        if top_k is not None:
-            top_values = mx.sort(logits[0])[-top_k:]
-            threshold = top_values[0]
-            logits_filtered = mx.where(logits[0] >= threshold, logits[0], float('-inf'))
-            logits = logits_filtered[None, :]
-
-        probs = mx.softmax(logits, axis=-1) # convert to probabilities
-        idx_next = mx.random.categorical(mx.log(probs[0]), num_samples=1) # sample from distribution
-        context.append(int(idx_next[0]))
-
-    if start_text:
-        generated_tokens = context[len(encode(start_text)):]
-    else:
-        generated_tokens = context[1:]
-
-    return decode(generated_tokens)
-
+    XY_split = mx.stack([X_split, Y_split], -1)
+    n = mx.random.randint(0, len(XY_split) - block_size, (batch_size,))
+    return XY_split[n], mx.stack([Z_split[n], Z_split[n]], axis=1)
 
 # ----------------------------------------------------------------------------------
 # Setup Network
@@ -167,7 +123,7 @@ def estimate_loss():
             logits = network.forward(X, save_ctx=False)
 
             # compute loss
-            loss_per_token = sequence_ce_loss.apply(logits, Y)
+            loss_per_token = sequence_ce_loss.apply(logits, Y)  # (10, 4) -> expect (2, 2)
             mean_loss = mx.mean(loss_per_token)
 
             losses.append(mean_loss.item())
@@ -194,22 +150,35 @@ for iter in range(max_iters):
 losses = estimate_loss()
 print(f"Final: train loss {losses['train']:.4f}, val loss {losses['val']:.4f}")
 
-prompts = [
-    "ROMEO:",
-    "To be or not to be",
-    "First Citizen:\n",
-    "The king",
-]
+total = 0
+correct = 0
+for x in range(max_num + 1):
+    for y in range(1, max_modulo + 1):
+        logits = network.forward(mx.array([[x, y]], dtype=mx.int32), save_ctx=False)
+        max_logit = mx.argmax(logits, axis=-1)[0]
 
-for prompt in prompts:
-    print(f"\nPrompt: '{prompt}'")
-    print("-" * 40)
-    generated = generate_text(
-        network,
-        start_text=prompt,
-        max_new_tokens=150,
-        temperature=0.8,
-        top_k=40
-    )
-    print(prompt + generated)
-    print()
+        pred = max_logit[0]
+        if (x % y) == int(pred):
+            correct += 1
+        else:
+            print(f"Error: {x} % {y} = {x % y}, not {pred}")
+
+        total += 1
+
+print(f"Accuracy: {100 * correct / total:.2f}%")
+
+
+# Error: 15 % 12 = 3, not 7
+# Error: 35 % 10 = 5, not 7
+# Error: 57 % 7 = 1, not 2
+# Error: 60 % 12 = 0, not 6
+# Error: 64 % 13 = 12, not 13
+# Error: 64 % 18 = 10, not 4
+# Error: 67 % 7 = 4, not 2
+# Error: 81 % 18 = 9, not 6
+# Error: 84 % 16 = 4, not 12
+# Error: 94 % 19 = 18, not 9
+# Error: 95 % 11 = 7, not 4
+# Error: 96 % 7 = 5, not 1
+# Error: 99 % 13 = 8, not 0
+# Accuracy: 99.36%
