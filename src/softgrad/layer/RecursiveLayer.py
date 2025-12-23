@@ -12,6 +12,10 @@ class RecursiveLayer(Layer):
             trainable_layers.extend(child.get_trainable_layers())
         return trainable_layers
 
+    def zero_grad(self):
+        for child in self.layers:
+            child.zero_grad()
+
     def freeze(self):
         for child in self.layers:
             child.freeze()

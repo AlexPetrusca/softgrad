@@ -1,9 +1,9 @@
 import mlx.core as mx
 from softgrad.Checkpoint import Checkpoint
-from softgrad.layer.Layer import Layer
+from softgrad.layer import TrainableLayer, Layer
 from softgrad.util.pytorch_loader import load_pytorch_weights_into_network
 
-class Network():
+class Network:
     def __init__(self, input_shape: tuple | int, layers=None):
         if isinstance(input_shape, int):
             self.input_shape = (input_shape,)
@@ -28,6 +28,16 @@ class Network():
         layer.link(self.output_shape)
         self.layers.append(layer)
         self.output_shape = layer.output_shape
+
+    def get_trainable_layers(self) -> list[TrainableLayer]:
+        trainable_layers = []
+        for layer in self.layers:
+            trainable_layers.extend(layer.get_trainable_layers())
+        return trainable_layers
+
+    def zero_grad(self):
+        for layer in self.layers:
+            layer.zero_grad()
 
     def freeze(self):
         for layer in self.layers:

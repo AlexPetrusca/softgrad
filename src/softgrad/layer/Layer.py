@@ -6,7 +6,6 @@ import mlx.core as mx
 class Layer(ABC):
     def __init__(self):
         self.ctx: Layer.Context = Layer.Context()
-        self.params: Layer.Parameters = Layer.Parameters()
         self.input_shape: Optional[tuple] = None
         self.output_shape: Optional[tuple] = None
 
@@ -33,6 +32,9 @@ class Layer(ABC):
 
     def get_trainable_layers(self):
         return []
+
+    def zero_grad(self):
+        pass
 
     def freeze(self):
         pass

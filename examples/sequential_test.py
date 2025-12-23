@@ -12,7 +12,7 @@ from softgrad import Network
 from softgrad.layer.conv import MaxPool2d, Conv2d
 from softgrad.layer.shim import MLX
 from softgrad.layer.transform import Flatten
-from softgrad.optim import SGD
+from softgrad.optim import SGD, AdamW
 from softgrad.function.activation import leaky_relu, softmax, relu
 from softgrad.function.loss import CrossEntropyLoss, cross_entropy_loss
 from softgrad.layer.core import Linear, Activation, Sequential
