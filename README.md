@@ -18,7 +18,7 @@ SoftGrad is designed to help you **understand** deep learning by implementing it
 - **Normalization Layers**: LayerNorm, BatchNorm
 - **Activations**: ReLU, LeakyReLU, Softmax, and custom function support
 - **Loss Functions**: Cross Entropy, Binary Cross Entropy, MSELoss
-- **Optimizers**: SGD with momentum and weight decay
+- **Optimizers**: SGD, AdamW, Lion
 - **Checkpointing**: Save and load model weights
 - **MLX Interop**: Use MLX models directly or load PyTorch weights
 
