@@ -284,7 +284,6 @@ network.add_layer(MLX(mlx_model))
 
 Contributions welcome! Areas of interest:
 
-- [ ] Additional optimizers (Adam, AdamW, RMSprop)
 - [ ] Data augmentation utilities
 - [ ] More layer types (GroupNorm, Dropout, etc.)
 - [ ] Visualization tools
